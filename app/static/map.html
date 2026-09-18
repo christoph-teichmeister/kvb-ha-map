@@ -28,6 +28,8 @@
   #controls .sub { margin-left: 16px; color: #555; font-size: 12px; }
   #status { left: 10px; bottom: 10px; max-width: 60vw; }
   #status.error { background: #fee; color: #900; }
+  #tilewarn { top: 10px; left: 50%; translate: -50% 0; max-width: min(90vw, 480px);
+              background: #fee; color: #900; }
   #bottomright { position: absolute; right: 10px; bottom: 10px; z-index: 1000;
                  display: flex; flex-direction: column; align-items: flex-end; gap: 8px; }
   #alertlist { position: static; width: 300px; max-height: 40vh; overflow: auto; display: none; }
@@ -433,6 +435,21 @@ function loadPrefs() {
   }
 }
 
+function warnOnTileErrors(tileLayer, hasCustomTileUrl) {
+  let failed = 0;
+  tileLayer.on('tileerror', () => {
+    failed++;
+    if (failed < 4 || document.getElementById('tilewarn')) return;
+    const div = document.createElement('div');
+    div.id = 'tilewarn';
+    div.className = 'panel';
+    div.innerHTML = hasCustomTileUrl
+      ? 'Map tiles failed to load. Check the <code>tile_url</code>/<code>tile_attribution</code> app options (wrong URL template, missing/invalid API key, or domain not allowlisted with your tile provider).'
+      : 'Map tiles failed to load — the default free tile source is blocking this request. Set a <code>tile_url</code> (e.g. from <a href="https://stadiamaps.com/" target="_blank" rel="noopener">Stadia Maps</a>\' free tier) in the app options. See the README’s "Map tiles" section.';
+    document.body.appendChild(div);
+  });
+}
+
 async function init() {
   let cfg = { default_map_center: { lat: 50.9375, lon: 6.9603 }, default_zoom: 13,
               vehicle_poll_cache_ttl_seconds: 15, alert_cache_ttl_seconds: 300 };
@@ -444,10 +461,11 @@ async function init() {
   ALERT_POLL_MS = (cfg.alert_cache_ttl_seconds || 300) * 1000;
 
   map = L.map('map').setView([cfg.default_map_center.lat, cfg.default_map_center.lon], cfg.default_zoom || 13);
-  L.tileLayer(cfg.tile_url || 'https://maps.wikimedia.org/osm-intl/{z}/{x}/{y}{r}.png', {
+  const tileLayer = L.tileLayer(cfg.tile_url || 'https://maps.wikimedia.org/osm-intl/{z}/{x}/{y}{r}.png', {
     maxZoom: 19,
     attribution: cfg.tile_attribution || 'Map <a href="https://wikimediafoundation.org/wiki/Maps_Terms_of_Use">Wikimedia</a> | &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
   }).addTo(map);
+  warnOnTileErrors(tileLayer, !!cfg.tile_url);
   networkLayer = L.layerGroup();
   stopLayer = L.layerGroup();
   vehicleLayer = L.layerGroup().addTo(map);
