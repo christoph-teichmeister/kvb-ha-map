@@ -30,7 +30,7 @@
   <ul class="stops" id="favorites"></ul>
 
   <h2>Abfahrtstafel</h2>
-  <div id="board" class="led-board"><div class="led-empty">Haltestelle suchen oder Favorit oben auswählen.</div></div>
+  <div id="board" class="board-group"><div class="led-board"><div class="led-empty">Haltestelle suchen oder Favorit oben auswählen.</div></div></div>
 </main>
 <script>
 const FAV_KEY = 'kvb-departures-favorites';
@@ -80,10 +80,10 @@ function renderStopList(container, stops) {
   container.innerHTML = '';
   for (const s of stops) {
     const li = document.createElement('li');
+    li.addEventListener('click', () => loadBoard(s.ext_id, s.name));
     const label = document.createElement('span');
     label.textContent = s.name;
     label.title = `ext_id: ${s.ext_id} (für die favorite_stop_ids-Option)`;
-    label.addEventListener('click', () => loadBoard(s.ext_id, s.name));
     const id = document.createElement('span');
     id.className = 'stop-id';
     id.textContent = s.ext_id;
@@ -116,17 +116,32 @@ async function search() {
   }
 }
 
+async function resolveMissingFavNames(ids) {
+  const names = loadFavNames();
+  const missing = ids.filter((id) => !names[id]);
+  if (!missing.length) return names;
+  await Promise.all(missing.map(async (id) => {
+    try {
+      const res = await fetch(`api/stops/details?ext_id=${encodeURIComponent(id)}`);
+      if (!res.ok) return;
+      const data = await res.json();
+      if (data.name) { names[id] = data.name; saveFavName(id, data.name); }
+    } catch (err) { /* keep showing the id */ }
+  }));
+  return names;
+}
+
 async function renderFavorites() {
   const container = document.getElementById('favorites');
   const ids = [...favIds()];
   if (!ids.length) { container.innerHTML = '<li class="empty">noch keine Favoriten — Haltestelle oben markieren</li>'; return; }
-  const names = loadFavNames();
+  const names = await resolveMissingFavNames(ids);
   container.innerHTML = '';
   for (const id of ids) {
     const li = document.createElement('li');
+    li.addEventListener('click', () => loadBoard(id, names[id] || id));
     const label = document.createElement('span');
     label.textContent = names[id] || id;
-    label.addEventListener('click', () => loadBoard(id, names[id] || id));
     const star = document.createElement('span');
     star.className = 'fav active';
     star.textContent = '★';
@@ -144,7 +159,7 @@ function fmtTime(hafas) {
 }
 
 function minutesUntil(hafas) {
-  if (!hafas || hafas.length < 8) return null;
+  if (!hafas || hafas.length < 4) return null;
   const now = new Date();
   const h = parseInt(hafas.slice(-6, -4), 10), m = parseInt(hafas.slice(-4, -2), 10);
   const target = new Date(now);
@@ -168,46 +183,71 @@ function headClock() {
 function renderBoard(data) {
   const board = document.getElementById('board');
   boardDepartures = data.departures || [];
-  board.innerHTML = `<div class="led-head"><span id="ledDate">${headDate()}</span><span id="ledClock">${headClock()}</span></div>
-    <div id="boardRows"></div>
-    <div id="boardTicker"></div>`;
+  board.innerHTML = `<div class="led-strip"><span id="ledDate">${headDate()}</span></div>
+    <div id="boardPlatforms"></div>
+    <div class="led-board" id="boardTickerWrap"><div id="boardTicker"></div></div>`;
   renderBoardRows();
   clearInterval(clockTimer);
   clockTimer = setInterval(() => {
-    const c = document.getElementById('ledClock');
-    if (c) c.textContent = headClock();
+    document.querySelectorAll('.led-clock').forEach(c => { c.textContent = headClock(); });
   }, 1000);
   loadTicker();
 }
 
+function groupByPlatform(deps) {
+  const groups = new Map();
+  for (const d of deps) {
+    const key = d.platform ? String(d.platform) : '';
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(d);
+  }
+  return [...groups.entries()].sort(([a], [b]) => {
+    if (a === '') return 1;
+    if (b === '') return -1;
+    const na = parseInt(a, 10), nb = parseInt(b, 10);
+    if (!isNaN(na) && !isNaN(nb)) return na - nb;
+    return a.localeCompare(b);
+  });
+}
+
 function renderBoardRows() {
-  const rows = document.getElementById('boardRows');
-  if (!rows) return;
-  if (!boardDepartures.length) { rows.innerHTML = '<div class="led-empty">keine Abfahrten</div>'; return; }
-  rows.innerHTML = boardDepartures.map(d => {
-    const eta = minutesUntil(d.realtime || d.planned);
-    const etaText = d.cancelled ? 'Entfällt' : eta === null ? '—' : eta <= 0 ? 'Sofort' : `${eta} Min`;
-    return `<div class="led-row${d.cancelled ? ' cancelled' : ''}">
-      <span class="led-num">${d.line}</span>
-      <span class="led-dest">${d.direction}</span>
-      <span class="led-track">${d.platform ? `Gleis ${d.platform}` : ''}</span>
-      <span class="led-eta">${etaText}</span>
+  const container = document.getElementById('boardPlatforms');
+  if (!container) return;
+  if (!boardDepartures.length) { container.innerHTML = '<div class="led-board"><div class="led-empty">keine Abfahrten</div></div>'; return; }
+  container.innerHTML = groupByPlatform(boardDepartures).map(([platform, deps]) => {
+    const rows = deps.map(d => {
+      const eta = minutesUntil(d.realtime || d.planned);
+      const etaText = d.cancelled ? 'Entfällt' : eta === null ? '—' : eta <= 0 ? 'Sofort' : `${eta} Min`;
+      return `<div class="led-row${d.cancelled ? ' cancelled' : ''}">
+        <span class="led-num">${d.line}</span>
+        <span class="led-dest">${d.direction}</span>
+        <span class="led-eta">${etaText}</span>
+      </div>`;
+    }).join('');
+    const label = platform ? `Steig ${platform}` : 'Ohne Steig-Angabe';
+    return `<div class="led-board">
+      <div class="led-head"><span>${label}</span><span class="led-clock">${headClock()}</span></div>
+      ${rows}
     </div>`;
   }).join('');
 }
 
 async function loadTicker() {
+  const wrap = document.getElementById('boardTickerWrap');
   const box = document.getElementById('boardTicker');
-  if (!box) return;
+  if (!box || !wrap) return;
   try {
     const res = await fetch('api/alerts');
-    if (!res.ok) { box.innerHTML = ''; return; }
+    if (!res.ok) { wrap.style.display = 'none'; return; }
     const data = await res.json();
     const relevant = (data.alerts || []).filter(a => !currentStopId || !a.stops?.length || a.stops.includes(currentStopId));
     const text = relevant.map(a => a.text).filter(Boolean).join('   •   ');
-    box.innerHTML = text ? `<div class="led-ticker"><span class="track">${text}</span></div>` : '';
+    if (!text) { wrap.style.display = 'none'; return; }
+    const duration = Math.max(16, text.length * 0.25);
+    wrap.style.display = '';
+    box.innerHTML = `<div class="led-ticker"><span class="track" style="animation-duration:${duration}s">${text}</span></div>`;
   } catch (err) {
-    box.innerHTML = '';
+    wrap.style.display = 'none';
   }
 }
 

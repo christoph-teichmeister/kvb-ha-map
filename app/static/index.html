@@ -57,7 +57,7 @@
 <footer class="app-footer">Inoffizieller Companion-Add-on für kvb-hafas-client. Keine Verbindung zur KVB.</footer>
 <script>
 function minutesUntil(hafas) {
-  if (!hafas || hafas.length < 8) return null;
+  if (!hafas || hafas.length < 4) return null;
   const now = new Date();
   const h = parseInt(hafas.slice(-6, -4), 10), m = parseInt(hafas.slice(-4, -2), 10);
   const target = new Date(now);

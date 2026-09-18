@@ -263,15 +263,16 @@ footer.app-footer { max-width: 960px; margin: 0 auto; padding: 0 16px 24px; colo
   color: #ff9f1c; font-size: 12.5px; letter-spacing: .06em; text-transform: uppercase;
   padding-bottom: 7px; margin-bottom: 4px; border-bottom: 1px solid rgb(255 159 28 / .25);
 }
+.board-group { display: flex; flex-direction: column; gap: 12px; }
+.led-strip { color: var(--text-secondary); font-size: 11.5px; text-transform: uppercase; letter-spacing: .06em; }
 .led-row {
-  display: grid; grid-template-columns: 30px 1fr 68px 58px; gap: 10px; align-items: baseline;
+  display: grid; grid-template-columns: 30px 1fr 58px; gap: 10px; align-items: baseline;
   padding: 6px 0; color: #ffb020; font-weight: 700; font-size: 16px; letter-spacing: .01em;
   text-shadow: 0 0 7px rgb(255 159 28 / .55), 0 0 1px rgb(255 176 32 / .9);
 }
 .led-row.cancelled { color: #a8721f; text-shadow: none; }
 .led-row .led-num { text-align: center; }
 .led-row .led-dest { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-transform: uppercase; }
-.led-row .led-track { font-size: 12.5px; opacity: .85; white-space: nowrap; }
 .led-row .led-eta { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .led-ticker {
   margin-top: 6px; padding-top: 6px; border-top: 1px solid rgb(255 159 28 / .2);
@@ -282,6 +283,5 @@ footer.app-footer { max-width: 960px; margin: 0 auto; padding: 0 16px 24px; colo
 @keyframes led-scroll { from { transform: translateX(0); } to { transform: translateX(-100%); } }
 .led-empty { color: #a8721f; font-size: 13px; padding: 10px 2px; }
 @media (max-width: 420px) {
-  .led-row { grid-template-columns: 24px 1fr 54px 46px; font-size: 14px; gap: 6px; }
-  .led-row .led-track { font-size: 11px; }
+  .led-row { grid-template-columns: 24px 1fr 46px; font-size: 14px; gap: 6px; }
 }
