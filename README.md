@@ -76,9 +76,8 @@ The server reads the exact same options from environment variables (with the
 same defaults) so it also runs directly, outside HA:
 
 ```bash
-python3 -m venv .venv && source .venv/bin/activate
-pip install -r requirements.txt
-python3 app/server.py       # http://localhost:8099
+uv sync
+uv run python3 app/server.py       # http://localhost:8099
 ```
 
 Env vars mirror the option names above, upper-cased
@@ -92,7 +91,8 @@ list and defaults.
 config.yaml       HA add-on manifest (options schema, ingress config)
 Dockerfile         Add-on image build
 run.sh             Entrypoint: options.json -> env vars -> server.py
-requirements.txt   kvb-hafas-client (from GitHub) + requests
+pyproject.toml     Project + deps (kvb-hafas-client from GitHub, requests), managed via uv
+uv.lock            Locked dependency versions for reproducible builds
 app/
   server.py         stdlib http.server app: vehicle/alert/network/stop APIs,
                      stop search + departures, live/historical stats,

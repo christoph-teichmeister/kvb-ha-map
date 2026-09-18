@@ -3,15 +3,20 @@ FROM $BUILD_FROM
 
 ENV LANG=C.UTF-8 \
     PYTHONUNBUFFERED=1 \
-    PYTHONDONTWRITEBYTECODE=1
+    PYTHONDONTWRITEBYTECODE=1 \
+    UV_PROJECT_ENVIRONMENT=/app/.venv \
+    UV_LINK_MODE=copy \
+    PATH="/app/.venv/bin:${PATH}"
 
 WORKDIR /app
 
-# git is needed only to pip-install kvb-hafas-client straight from GitHub.
+# git is needed only to resolve kvb-hafas-client straight from GitHub.
 RUN apk add --no-cache git bash jq
 
-COPY requirements.txt /app/requirements.txt
-RUN pip install --no-cache-dir -r /app/requirements.txt
+COPY --from=ghcr.io/astral-sh/uv:0.9-alpine /usr/local/bin/uv /usr/local/bin/uv
+
+COPY pyproject.toml uv.lock /app/
+RUN uv sync --frozen --no-dev
 
 COPY app /app/app
 COPY data /app/data
