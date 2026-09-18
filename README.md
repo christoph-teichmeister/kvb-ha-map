@@ -57,38 +57,19 @@ just to keep history.
    page in **Settings → Apps** and toggle **Show in sidebar** — newer HA
    versions leave this off by default even for ingress-enabled apps.
 
-## Map tiles: OpenStreetMap usage policy
+## Map tiles
 
-**There is currently no free, keyless raster tile source that works
-out of the box for this app.** The map's built-in default,
-[Wikimedia](https://wikimediafoundation.org/wiki/Maps_Terms_of_Use)'s
-OSM-intl basemap (`maps.wikimedia.org/osm-intl`), now rejects requests from
-this app with `Forbidden: Map tiles are restricted to Wikimedia and
-affiliated sites only` — Wikimedia checks the requesting site's origin and
-this app isn't on their allowlist. Pointing `tile_url` at
-`tile.openstreetmap.org` directly doesn't help either: OSM's
-[tile usage policy](https://operations.osmfoundation.org/policies/tiles/)
-explicitly disallows embedding their raw tile servers in an app installed on
-many different machines, and that gets flagged and blocked too ("Access
-blocked... not following the tile usage policy"). CARTO's Voyager basemap
-used to be a free no-key alternative here, but now requires an API key
-("API key required" watermark).
-
-If the map shows a grey background with no streets, or a banner saying
-tiles failed to load, this is why — **you need to configure your own tile
-source** via the `tile_url`/`tile_attribution` app options.
+This app needs its own tile source — set it via the `tile_url`/
+`tile_attribution` app options. If the map shows a grey background with no
+streets, or a banner saying tiles failed to load, tiles aren't configured
+(or misconfigured) yet.
 
 ### Recommended: Stadia Maps free tier
 
-1. Create a free account at [stadiamaps.com](https://stadiamaps.com/) —
-   the free tier covers non-commercial personal use.
-2. In the Stadia dashboard, add your Home Assistant's external URL(s) as an
-   allowlisted domain/referrer for the "Alidade Smooth" (or any) map style —
-   this authenticates requests without needing an API key in the tile URL.
-   If you access the app from multiple origins (e.g. local LAN IP *and* a
-   Nabu Casa remote URL), add all of them.
-3. Set the app options:
-   - `tile_url`: `https://tiles.stadiamaps.com/tiles/alidade_smooth/{z}/{x}/{y}{r}.png`
+1. Create a free account at [stadiamaps.com](https://stadiamaps.com/) and
+   generate an API key — the free tier covers non-commercial personal use.
+2. Set the app options:
+   - `tile_url`: `https://tiles.stadiamaps.com/tiles/alidade_smooth/{z}/{x}/{y}{r}.png?api_key=YOUR_KEY`
    - `tile_attribution`: `&copy; <a href="https://stadiamaps.com/" target="_blank">Stadia Maps</a> &copy; <a href="https://openmaptiles.org/" target="_blank">OpenMapTiles</a> &copy; <a href="https://www.openstreetmap.org/copyright" target="_blank">OpenStreetMap</a> contributors`
 
 Other options: a MapTiler or Thunderforest API key, or your own self-hosted
@@ -108,8 +89,8 @@ tile server (e.g. TileServer GL) if you want no external dependency at all.
 | `default_zoom`                    | `13`           | Initial map zoom.                                                                                                                                                                                                                                                                |
 | `favorite_stop_ids`               | `[]`           | Stop `ext_id`s shown as favorites on the departures page — **not** stop names; use the search box on the Departures page and copy the small grey id shown next to each result (also toggleable there via the star icon, which stores favorites in browser localStorage instead). |
 | `dashboard_refresh_seconds`       | `15`           | Auto-refresh interval for the dashboard page.                                                                                                                                                                                                                                    |
-| `tile_url`                        | *(blocked)*    | Leaflet tile URL template (`{s}`/`{z}`/`{x}`/`{y}`/`{r}`). Required — the built-in Wikimedia fallback now rejects requests from this app; see "Map tiles" above.                                                                                                                |
-| `tile_attribution`                | *(blocked)*    | Attribution HTML shown on the map for the tile source above.                                                                                                                                                                                                                     |
+| `tile_url`                        | *(required)*   | Leaflet tile URL template (`{s}`/`{z}`/`{x}`/`{y}`/`{r}`); see "Map tiles" above.                                                                                                                                                                                                 |
+| `tile_attribution`                | *(required)*   | Attribution HTML shown on the map for the tile source above.                                                                                                                                                                                                                     |
 
 ## Standalone / local development (no Home Assistant)
 
