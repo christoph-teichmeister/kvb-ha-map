@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>KVB Dashboard</title>
+<style>
+  html, body { margin: 0; font: 14px/1.4 system-ui, sans-serif; background: #f4f4f4; color: #222; }
+  header { background: #fff; padding: 10px 16px; box-shadow: 0 1px 4px rgba(0,0,0,.1); position: sticky; top: 0; }
+  header a { color: #06c; text-decoration: none; margin-right: 12px; font-size: 12px; }
+  main { max-width: 900px; margin: 0 auto; padding: 16px; }
+  h2 { font-size: 15px; margin: 20px 0 8px; }
+  .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
+  .tile { background: #fff; border-radius: 8px; padding: 12px 14px; box-shadow: 0 1px 4px rgba(0,0,0,.08); }
+  .tile .v { font-size: 24px; font-weight: 700; }
+  .tile .l { font-size: 11px; color: #667; margin-top: 2px; }
+  table { width: 100%; border-collapse: collapse; background: #fff; border-radius: 6px; overflow: hidden; margin-top: 6px; }
+  th, td { text-align: left; padding: 6px 10px; border-bottom: 1px solid #eee; font-size: 13px; }
+  th { background: #f0f4f8; font-weight: 600; }
+  .empty, .err { padding: 8px; color: #888; }
+  .err { color: #900; background: #fee; border-radius: 6px; }
+  .note { font-size: 11px; color: #888; margin-top: 4px; }
+</style>
+</head>
+<body>
+<header>
+  <a href="index.html">Home</a><a href="map.html">Map</a><a href="departures.html">Departures</a>
+</header>
+<main>
+  <h2>Live</h2>
+  <div class="tiles" id="liveTiles"></div>
+
+  <h2>Historical delays</h2>
+  <div class="tiles" id="delayTiles"></div>
+  <h2>Least punctual lines</h2>
+  <div id="leastPunctual"></div>
+  <div class="note" id="historyNote"></div>
+</main>
+<script>
+let refreshSeconds = 15;
+
+function tile(value, label) {
+  return `<div class="tile"><div class="v">${value}</div><div class="l">${label}</div></div>`;
+}
+
+async function refreshLive() {
+  const box = document.getElementById('liveTiles');
+  try {
+    const res = await fetch('api/stats/live');
+    const d = await res.json();
+    if (!res.ok) throw new Error(d.error || res.statusText);
+    box.innerHTML = [
+      tile(d.vehicle_count, 'vehicles in view'),
+      tile(d.local_vehicle_count, 'KVB tram/bus'),
+      tile(d.busiest_line ?? '—', 'busiest line'),
+      tile(d.max_current_delay_minutes ?? '—', 'max current delay (min)'),
+      tile(d.delayed_vehicle_count, `delayed ≥${d.delayed_threshold_minutes}min`),
+      tile(d.vehicles_with_realtime, 'vehicles with realtime data'),
+    ].join('');
+  } catch (err) {
+    box.innerHTML = `<div class="err">${err.message}</div>`;
+  }
+}
+
+async function refreshDelays() {
+  const box = document.getElementById('delayTiles');
+  const table = document.getElementById('leastPunctual');
+  const note = document.getElementById('historyNote');
+  try {
+    const res = await fetch('api/stats/delays');
+    const d = await res.json();
+    if (!res.ok) throw new Error(d.error || res.statusText);
+    if (d.error === 'history disabled') {
+      note.textContent = 'History is disabled (history_enabled=false) — no historical stats available.';
+      box.innerHTML = '';
+      table.innerHTML = '';
+      return;
+    }
+    note.textContent = '';
+    box.innerHTML = [
+      tile(d.max_delay_minutes ?? '—', 'max observed delay (min)'),
+      tile(d.lines ? d.lines.length : 0, 'lines observed'),
+    ].join('');
+    const rows = (d.least_punctual_lines || []).map(l =>
+      `<tr><td>${l.line}</td><td>${(l.punctuality_rate * 100).toFixed(1)}%</td>
+       <td>${l.avg_delay_minutes ?? '—'}</td><td>${l.observations}</td></tr>`
+    ).join('');
+    table.innerHTML = rows
+      ? `<table><thead><tr><th>Line</th><th>Punctuality</th><th>Avg delay (min)</th><th>Observations</th></tr></thead>
+         <tbody>${rows}</tbody></table>`
+      : '<div class="empty">not enough history yet</div>';
+  } catch (err) {
+    box.innerHTML = `<div class="err">${err.message}</div>`;
+    table.innerHTML = '';
+  }
+}
+
+function refreshAll() {
+  refreshLive();
+  refreshDelays();
+}
+
+async function init() {
+  try {
+    const res = await fetch('api/config');
+    if (res.ok) {
+      const cfg = await res.json();
+      refreshSeconds = cfg.dashboard_refresh_seconds || 15;
+    }
+  } catch (err) { /* defaults */ }
+  refreshAll();
+  setInterval(refreshAll, refreshSeconds * 1000);
+}
+
+init();
+</script>
+</body>
+</html>

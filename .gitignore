@@ -1,0 +1,12 @@
+__pycache__/
+*.pyc
+*.db
+*.db-journal
+*.sqlite
+*.sqlite3
+.venv/
+venv/
+*.egg-info/
+.DS_Store
+data/map_geometry.json
+data/history.db

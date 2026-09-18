@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>KVB Departures</title>
+<style>
+  html, body { margin: 0; font: 14px/1.4 system-ui, sans-serif; background: #f4f4f4; color: #222; }
+  header { background: #fff; padding: 10px 16px; box-shadow: 0 1px 4px rgba(0,0,0,.1); position: sticky; top: 0; }
+  header a { color: #06c; text-decoration: none; margin-right: 12px; font-size: 12px; }
+  main { max-width: 720px; margin: 0 auto; padding: 16px; }
+  h2 { font-size: 15px; margin: 18px 0 8px; }
+  .search { display: flex; gap: 8px; }
+  .search input { flex: 1; padding: 8px 10px; border: 1px solid #ccc; border-radius: 6px; font-size: 14px; }
+  .search button { padding: 8px 14px; border: none; border-radius: 6px; background: #06c; color: #fff; cursor: pointer; }
+  ul.stops { list-style: none; margin: 8px 0; padding: 0; }
+  ul.stops li { padding: 8px 10px; background: #fff; border-radius: 6px; margin-bottom: 6px; cursor: pointer;
+                display: flex; justify-content: space-between; align-items: center; }
+  ul.stops li:hover { background: #eef4fa; }
+  ul.stops li .fav { cursor: pointer; color: #ccc; font-size: 16px; }
+  ul.stops li .fav.active { color: #e6a700; }
+  table { width: 100%; border-collapse: collapse; background: #fff; border-radius: 6px; overflow: hidden; }
+  th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid #eee; font-size: 13px; }
+  th { background: #f0f4f8; font-weight: 600; }
+  tr.cancelled td { text-decoration: line-through; color: #999; }
+  .delay-pos { color: #c00; font-weight: 600; }
+  .delay-neg { color: #080; }
+  .empty { color: #888; padding: 10px; }
+  #boardTitle { font-weight: 600; }
+  .err { color: #900; padding: 8px; background: #fee; border-radius: 6px; }
+</style>
+</head>
+<body>
+<header>
+  <a href="index.html">Home</a><a href="map.html">Map</a><a href="dashboard.html">Dashboard</a>
+</header>
+<main>
+  <h2>Search stops</h2>
+  <div class="search">
+    <input type="text" id="query" placeholder="e.g. Neumarkt">
+    <button id="searchBtn">Search</button>
+  </div>
+  <ul class="stops" id="results"></ul>
+
+  <h2>Favorites</h2>
+  <ul class="stops" id="favorites"></ul>
+
+  <h2><span id="boardTitle">Departures</span></h2>
+  <div id="board"><div class="empty">Search for a stop or pick a favorite above.</div></div>
+</main>
+<script>
+const FAV_KEY = 'kvb-departures-favorites';
+let cfg = { favorite_stop_ids: [] };
+let currentStopId = null, currentStopName = null;
+let boardTimer = null;
+
+function loadLocalFavs() {
+  try { return JSON.parse(localStorage.getItem(FAV_KEY) || '[]'); } catch { return []; }
+}
+function saveLocalFavs(list) {
+  try { localStorage.setItem(FAV_KEY, JSON.stringify(list)); } catch { /* private mode */ }
+}
+
+function favIds() {
+  // Union of add-on-configured favorites and ones the browser has starred locally.
+  return new Set([...(cfg.favorite_stop_ids || []), ...loadLocalFavs()]);
+}
+
+function toggleFav(id, name) {
+  const local = new Set(loadLocalFavs());
+  if (local.has(id)) local.delete(id); else local.add(id);
+  saveLocalFavs([...local]);
+  renderFavorites();
+  renderResultsCache();
+}
+
+let lastResults = [];
+
+function renderResultsCache() {
+  renderStopList(document.getElementById('results'), lastResults);
+}
+
+function renderStopList(container, stops) {
+  const favs = favIds();
+  container.innerHTML = '';
+  for (const s of stops) {
+    const li = document.createElement('li');
+    const label = document.createElement('span');
+    label.textContent = s.name;
+    label.addEventListener('click', () => loadBoard(s.ext_id, s.name));
+    const star = document.createElement('span');
+    star.className = 'fav' + (favs.has(s.ext_id) ? ' active' : '');
+    star.textContent = favs.has(s.ext_id) ? '★' : '☆';
+    star.title = 'toggle favorite';
+    star.addEventListener('click', (e) => { e.stopPropagation(); toggleFav(s.ext_id, s.name); });
+    li.appendChild(label);
+    li.appendChild(star);
+    container.appendChild(li);
+  }
+}
+
+async function search() {
+  const q = document.getElementById('query').value.trim();
+  const results = document.getElementById('results');
+  if (!q) { results.innerHTML = ''; return; }
+  results.innerHTML = '<li class="empty">searching …</li>';
+  try {
+    const res = await fetch(`api/stops/search?q=${encodeURIComponent(q)}`);
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || res.statusText);
+    lastResults = data.stops || [];
+    renderResultsCache();
+    if (!lastResults.length) results.innerHTML = '<li class="empty">no matches</li>';
+  } catch (err) {
+    results.innerHTML = `<li class="err">${err.message}</li>`;
+  }
+}
+
+async function renderFavorites() {
+  const container = document.getElementById('favorites');
+  const ids = [...favIds()];
+  if (!ids.length) { container.innerHTML = '<li class="empty">no favorites yet — star a stop above</li>'; return; }
+  // We only have ids for configured favorites, no names — resolve via search-by-id
+  // is not supported by the API, so show the id itself; clicking still loads the board.
+  container.innerHTML = '';
+  for (const id of ids) {
+    const li = document.createElement('li');
+    const label = document.createElement('span');
+    label.textContent = id;
+    label.addEventListener('click', () => loadBoard(id, id));
+    const star = document.createElement('span');
+    star.className = 'fav active';
+    star.textContent = '★';
+    star.addEventListener('click', (e) => { e.stopPropagation(); toggleFav(id, id); });
+    li.appendChild(label);
+    li.appendChild(star);
+    container.appendChild(li);
+  }
+}
+
+function fmtTime(hafas) {
+  if (!hafas) return '—';
+  const t = hafas.slice(-6);
+  return `${t.slice(0, 2)}:${t.slice(2, 4)}`;
+}
+
+function renderBoard(data) {
+  const board = document.getElementById('board');
+  const deps = data.departures || [];
+  if (!deps.length) { board.innerHTML = '<div class="empty">no departures</div>'; return; }
+  const rows = deps.map(d => {
+    const delay = d.delay_minutes;
+    const delayText = delay === null || delay === undefined ? '—'
+      : delay > 0 ? `<span class="delay-pos">+${delay}</span>`
+      : delay < 0 ? `<span class="delay-neg">${delay}</span>` : '0';
+    return `<tr class="${d.cancelled ? 'cancelled' : ''}">
+      <td>${d.line}</td>
+      <td>${d.direction}</td>
+      <td>${fmtTime(d.planned)}</td>
+      <td>${d.realtime ? fmtTime(d.realtime) : '—'}</td>
+      <td>${delayText}</td>
+      <td>${d.platform || '—'}</td>
+      <td>${d.cancelled ? 'cancelled' : ''}</td>
+    </tr>`;
+  }).join('');
+  board.innerHTML = `<table>
+    <thead><tr><th>Line</th><th>Direction</th><th>Planned</th><th>Realtime</th><th>Delay</th><th>Platform</th><th></th></tr></thead>
+    <tbody>${rows}</tbody>
+  </table>`;
+}
+
+async function refreshBoard() {
+  if (!currentStopId) return;
+  try {
+    const res = await fetch(`api/departures?stop_id=${encodeURIComponent(currentStopId)}&max=15`);
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || res.statusText);
+    renderBoard(data);
+  } catch (err) {
+    document.getElementById('board').innerHTML = `<div class="err">${err.message}</div>`;
+  }
+}
+
+function loadBoard(id, name) {
+  currentStopId = id;
+  currentStopName = name;
+  document.getElementById('boardTitle').textContent = `Departures — ${name}`;
+  clearInterval(boardTimer);
+  refreshBoard();
+  boardTimer = setInterval(refreshBoard, 30000);
+}
+
+async function init() {
+  try {
+    const res = await fetch('api/config');
+    if (res.ok) cfg = await res.json();
+  } catch (err) { /* defaults */ }
+  renderFavorites();
+  document.getElementById('searchBtn').addEventListener('click', search);
+  document.getElementById('query').addEventListener('keydown', (e) => { if (e.key === 'Enter') search(); });
+}
+
+init();
+</script>
+</body>
+</html>

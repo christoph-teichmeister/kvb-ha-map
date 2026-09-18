@@ -1,0 +1,2 @@
+kvb-hafas-client @ git+https://github.com/christoph-teichmeister/kvb-hafas-client.git
+requests>=2.31

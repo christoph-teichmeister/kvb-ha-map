@@ -1,0 +1,489 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>KVB live</title>
+<link rel="stylesheet" href="vendor/leaflet.css">
+<script src="vendor/leaflet.js"></script>
+<style>
+  html, body { margin: 0; height: 100%; font: 14px/1.4 system-ui, sans-serif; }
+  #map { height: 100%; }
+  .veh { border-radius: 10px; color: #fff; font-weight: 700; font-size: 11px;
+         text-align: center; line-height: 18px; height: 18px; min-width: 26px; padding: 0 3px;
+         box-shadow: 0 1px 4px rgba(0,0,0,.4); border: 1px solid rgba(255,255,255,.8);
+         white-space: nowrap; }
+  .veh-tram { background: #b00; }
+  .veh-bus  { background: #06c; }
+  .veh-rail { background: #444; }
+  .veh.late { border-color: #fc0; box-shadow: 0 0 0 2px #fc0, 0 1px 4px rgba(0,0,0,.4); }
+  .veh .d { font-weight: 400; opacity: .9; }
+  .panel { position: absolute; z-index: 1000; background: #fff; border-radius: 6px;
+           box-shadow: 0 1px 6px rgba(0,0,0,.3); padding: 8px 10px; }
+  #nav { top: 10px; left: 10px; font-size: 12px; }
+  #nav a { color: #06c; text-decoration: none; margin-right: 10px; }
+  #controls { top: 10px; right: 10px; width: 210px; }
+  #controls label { display: block; margin: 3px 0; }
+  #controls input[type=text] { width: 100%; box-sizing: border-box; margin-bottom: 6px; }
+  #controls .sub { margin-left: 16px; color: #555; font-size: 12px; }
+  #status { left: 10px; bottom: 10px; max-width: 60vw; }
+  #status.error { background: #fee; color: #900; }
+  #bottomright { position: absolute; right: 10px; bottom: 10px; z-index: 1000;
+                 display: flex; flex-direction: column; align-items: flex-end; gap: 8px; }
+  #alertlist { position: static; width: 300px; max-height: 40vh; overflow: auto; display: none; }
+  #prefetch { position: static; width: 360px; max-width: calc(100vw - 40px); font-size: 12px;
+              display: none; opacity: 0; translate: 0 6px;
+              transition: opacity .25s ease, translate .25s ease, display .25s allow-discrete; }
+  #prefetch.show { display: block; opacity: 1; translate: 0 0; }
+  @starting-style { #prefetch.show { opacity: 0; translate: 0 6px; } }
+  @media (prefers-reduced-motion: reduce) { #prefetch { transition: none; } }
+  #prefetch b { display: block; font-size: 13px; }
+  #prefetch .sub { color: #555; margin-top: 3px; }
+  #prefetch .now { color: #06c; margin-top: 3px; word-break: break-word; }
+  #prefetch .bar { height: 6px; margin-top: 5px; border-radius: 3px; background: #e5e5e5; overflow: hidden; }
+  #prefetch .bar i { display: block; height: 100%; background: #06c; }
+  #alertlist li { margin-bottom: 8px; font-size: 12px; }
+  #alertlist ul { margin: 4px 0 0; padding-left: 16px; }
+  .alert-pin { background: #e67e00; border: 2px solid #fff; border-radius: 50%;
+               width: 14px; height: 14px; box-shadow: 0 1px 4px rgba(0,0,0,.5); }
+</style>
+</head>
+<body>
+<div id="map"></div>
+<div class="panel" id="nav"><a href="index.html">Home</a><a href="departures.html">Departures</a><a href="dashboard.html">Dashboard</a></div>
+<div class="panel" id="controls">
+  <input type="text" id="lines" placeholder="Lines, e.g. 1,9,18">
+  <label><input type="checkbox" class="cat" value="tram" checked> Tram/Stadtbahn</label>
+  <label class="sub"><input type="checkbox" class="stopcat" value="tram"> Stops</label>
+  <label class="sub"><input type="checkbox" class="netcat" value="tram"> Routes</label>
+  <label><input type="checkbox" class="cat" value="bus" checked> Bus</label>
+  <label class="sub"><input type="checkbox" class="stopcat" value="bus"> Stops</label>
+  <label class="sub"><input type="checkbox" class="netcat" value="bus"> Routes</label>
+  <label><input type="checkbox" class="cat" value="rail" checked> Train/S-Bahn</label>
+  <label class="sub"><input type="checkbox" class="stopcat" value="rail"> Stations</label>
+  <label class="sub"><input type="checkbox" class="netcat" value="rail"> Routes</label>
+  <label><input type="checkbox" id="onlyLate"> only delayed 3+ min</label>
+  <label><input type="checkbox" id="showAlerts"> Service alerts</label>
+</div>
+<div class="panel" id="status">loading …</div>
+<div id="bottomright">
+  <div class="panel" id="alertlist"></div>
+  <div class="panel" id="prefetch">
+    <b>Loading route geometry</b>
+    <div class="sub" id="prefetchWhat"></div>
+    <div class="bar"><i id="prefetchBar" style="width:0"></i></div>
+    <div class="now" id="prefetchNow"></div>
+    <div class="sub">While a line is missing it's drawn as a straight line —
+      its geometry is fetched once per line/direction and then cached.</div>
+  </div>
+</div>
+<script>
+// Every URL below is relative (no leading slash) so it resolves against the
+// current page URL — including HA Ingress's dynamic base path, whatever it
+// is, without this script ever needing to know it.
+const LATE_FROM = 3;             // minutes delay before a vehicle counts as late
+const START_RATE = 0.003;        // lines/ms, seed for the progress bar before the first measurement
+
+let POLL_MS = 15000;
+let ALERT_POLL_MS = 300000;
+const NETWORK_POLL_MS = 60000;   // the server's background prefetch fills the network in over time
+
+let map, networkLayer, stopLayer, vehicleLayer, alertLayer;
+const networkLines = new Map();
+let stopMarkers = [];
+const STOP_COLOURS = { tram: '#b00', bus: '#06c', rail: '#444' };
+const STOP_ZOOM = 13;
+
+let status, alertList;
+const fleet = new Map();
+let pollTimer = null, moveTimer = null, lastPayload = null;
+
+const CAT_COLOURS = [[/s-?bahn/, '#008d4f'], [/ice|^ic$|fern|tha|flx/, '#ec0016'], [/re|rb|regio|sev/, '#646973']];
+
+function lineColour(colour, category) {
+  if (colour && !/^#f{3,6}$/i.test(colour)) return colour;
+  const c = (category || '').toLowerCase();
+  return (CAT_COLOURS.find(([re]) => re.test(c)) || [null, '#888'])[1];
+}
+
+function cssClass(category) {
+  const c = (category || '').toLowerCase();
+  if (c.includes('str') || c.includes('tram') || c.includes('stadtbahn')) return 'tram';
+  if (c.includes('bus')) return 'bus';
+  return 'rail';
+}
+
+function filters() {
+  const raw = document.getElementById('lines').value.trim();
+  return {
+    lines: raw ? raw.split(',').map(s => s.trim().toLowerCase()).filter(Boolean) : null,
+    cats: new Set([...document.querySelectorAll('.cat:checked')].map(c => c.value)),
+    onlyLate: document.getElementById('onlyLate').checked,
+  };
+}
+
+function matches(v, f) {
+  if (!f.cats.has(cssClass(v.category))) return false;
+  if (f.lines && !f.lines.includes(v.line.toLowerCase())) return false;
+  if (f.onlyLate && !(v.delay >= LATE_FROM)) return false;
+  return true;
+}
+
+function icon(v) {
+  const late = v.delay >= LATE_FROM;
+  const suffix = late ? ` <span class="d">+${v.delay}</span>` : '';
+  const colour = lineColour(v.colour, v.category);
+  const style = colour ? ` style="background:${colour};color:${v.colour === colour ? (v.text_colour || '#fff') : '#fff'}"` : '';
+  return L.divIcon({ className: '', iconSize: null,
+    html: `<div class="veh veh-${cssClass(v.category)}${late ? ' late' : ''}"${style}>${v.line}${suffix}</div>` });
+}
+
+function popup(v) {
+  const delay = v.delay === null ? 'no realtime data'
+    : v.delay > 0 ? `${v.delay} min late` : v.delay < 0 ? `${-v.delay} min early` : 'on time';
+  return `<b>${v.line}</b> → ${v.direction}<br>next stop: ${v.next_stop || '—'}<br>${delay}`;
+}
+
+function positionAt(track, elapsed) {
+  if (!track.length) return null;
+  if (elapsed <= track[0][0]) return [track[0][1], track[0][2]];
+  for (let i = 1; i < track.length; i++) {
+    const [t0, la0, lo0] = track[i - 1], [t1, la1, lo1] = track[i];
+    if (elapsed <= t1) {
+      const r = t1 === t0 ? 0 : (elapsed - t0) / (t1 - t0);
+      return [la0 + (la1 - la0) * r, lo0 + (lo1 - lo0) * r];
+    }
+  }
+  const last = track[track.length - 1];
+  return [last[1], last[2]];
+}
+
+function animate() {
+  const now = Date.now();
+  animatePrefetch(now);
+  for (const v of fleet.values()) {
+    if (!v.shown) continue;
+    const p = positionAt(v.track, now - v.servedAt);
+    if (p) v.marker.setLatLng(p);
+  }
+  requestAnimationFrame(animate);
+}
+
+async function refresh() {
+  const b = map.getBounds();
+  const bbox = [b.getSouth(), b.getWest(), b.getNorth(), b.getEast()]
+    .map(n => n.toFixed(5)).join(',');
+  try {
+    const res = await fetch(`api/vehicles?bbox=${bbox}`);
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || res.statusText);
+    lastPayload = data;
+    apply(data);
+  } catch (err) {
+    status.textContent = `Error: ${err.message}`;
+    status.classList.add('error');
+  }
+}
+
+function apply(data) {
+  const f = filters(), seen = new Set();
+  for (const v of data.vehicles) {
+    seen.add(v.jid);
+    const track = v.track.length ? v.track : [[0, v.lat, v.lon]];
+    let entry = fleet.get(v.jid);
+    if (!entry) {
+      entry = { marker: L.marker([v.lat, v.lon], { icon: icon(v) }), track, servedAt: data.served_at, shown: false };
+      fleet.set(v.jid, entry);
+    } else {
+      entry.track = track;
+      entry.servedAt = data.served_at;
+      entry.marker.setIcon(icon(v));
+    }
+    entry.vehicle = v;
+    entry.marker.bindPopup(popup(v));
+    show(entry, matches(v, f));
+  }
+  for (const [jid, entry] of fleet) {
+    if (!seen.has(jid)) { vehicleLayer.removeLayer(entry.marker); fleet.delete(jid); }
+  }
+  render(data);
+}
+
+function show(entry, visible) {
+  if (visible === entry.shown) return;
+  if (visible) vehicleLayer.addLayer(entry.marker); else vehicleLayer.removeLayer(entry.marker);
+  entry.shown = visible;
+}
+
+let prefetch = null;
+
+function renderPrefetch(p) {
+  const box = document.getElementById('prefetch');
+  if (!p || !p.pending) { box.classList.remove('show'); prefetch = null; return; }
+  const done = Math.max(0, p.queued - p.pending);
+  const now = Date.now();
+  let rate = prefetch ? prefetch.rate : START_RATE;
+  if (prefetch && now > prefetch.at && done > prefetch.done) {
+    const measured = (done - prefetch.done) / (now - prefetch.at);
+    rate = rate ? rate * 0.5 + measured * 0.5 : measured;
+  }
+  prefetch = { done, queued: p.queued, at: now, rate,
+              shown: prefetch ? prefetch.shown : done, pct: prefetch ? prefetch.pct : 0 };
+  box.classList.add('show');
+  document.getElementById('prefetchWhat').textContent =
+    `${done} of ${p.queued} lines/directions fetched${eta(rate, p.pending)}`;
+  document.getElementById('prefetchNow').textContent =
+    p.current && p.current.length ? `now: ${p.current.join(', ')}` : '';
+}
+
+function animatePrefetch(now) {
+  if (!prefetch) return;
+  const predicted = prefetch.done + prefetch.rate * (now - prefetch.at);
+  const cap = prefetch.queued - 0.5;
+  prefetch.shown = Math.max(prefetch.shown, Math.min(predicted, cap));
+  const pct = prefetch.queued ? (prefetch.shown / prefetch.queued) * 100 : 0;
+  prefetch.pct = Math.max(prefetch.pct || 0, pct);
+  document.getElementById('prefetchBar').style.width = `${prefetch.pct}%`;
+}
+
+function eta(rate, pending) {
+  if (!rate) return '';
+  const left = Math.round(pending / rate / 1000);
+  if (!isFinite(left) || left <= 0) return '';
+  return left < 60 ? ` · ~${left}s left` : ` · ~${Math.round(left / 60)}min left`;
+}
+
+function render(data) {
+  renderPrefetch(data.prefetch);
+  const shown = [...fleet.values()].filter(e => e.shown);
+  const late = shown.filter(e => e.vehicle.delay >= LATE_FROM).length;
+  const geo = data.known_segments || 0;
+  status.classList.remove('error');
+  const drawn = networkLayer.getLayers().length;
+  status.textContent = `${shown.length}/${data.vehicles.length} vehicles · ${late} delayed · `
+    + `${drawn} of ${geo} route segments drawn (filtered) · `
+    + `as of ${new Date(data.served_at).toLocaleTimeString()}`;
+}
+
+function refilter() {
+  const f = filters();
+  for (const entry of fleet.values()) show(entry, matches(entry.vehicle, f));
+  drawNetwork();
+  drawStops();
+  if (lastPayload) render(lastPayload);
+}
+
+async function refreshAlerts() {
+  if (!document.getElementById('showAlerts').checked) return;
+  try {
+    const res = await fetch('api/alerts');
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || res.statusText);
+    alertLayer.clearLayers();
+    for (const a of data.alerts) {
+      for (const [lat, lon] of a.points) {
+        L.marker([lat, lon], { icon: L.divIcon({ className: '', html: '<div class="alert-pin"></div>' }) })
+          .bindPopup(`<b>${a.stops.join(', ') || 'Alert'}</b><br>${a.text}`)
+          .addTo(alertLayer);
+      }
+    }
+    const textOnly = data.alerts.filter(a => !a.points.length);
+    alertList.innerHTML = `<b>${data.alerts.length} alerts</b>`
+      + (textOnly.length ? `<ul>${textOnly.map(a => `<li>${a.text}</li>`).join('')}</ul>` : '');
+  } catch (err) {
+    alertList.innerHTML = `Alerts: ${err.message}`;
+  }
+}
+
+async function loadNetwork() {
+  const res = await fetch('api/network');
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || res.statusText);
+  networkLines.clear();
+  for (const line of data.lines) {
+    const colour = lineColour(line.colour, line.category);
+    const polylines = line.paths.map(path => {
+      const schematic = path.length < 3;
+      return L.polyline(path, { color: colour, weight: schematic ? 2 : 4, opacity: 0.75,
+        dashArray: schematic ? '6 6' : null }).bindPopup(`Line ${line.line}`);
+    });
+    networkLines.set(line.line, { polylines, category: line.category });
+  }
+}
+
+function drawNetwork() {
+  networkLayer.clearLayers();
+  const cats = netCats();
+  if (!cats.size) return;
+  const f = filters();
+  for (const [name, entry] of networkLines) {
+    if (!cats.has(cssClass(entry.category))) continue;
+    if (f.lines && !f.lines.includes(name.toLowerCase())) continue;
+    entry.polylines.forEach(p => networkLayer.addLayer(p));
+  }
+}
+
+function netCats() {
+  return new Set([...document.querySelectorAll('.netcat:checked')].map(c => c.value));
+}
+
+function stopCats() {
+  return new Set([...document.querySelectorAll('.stopcat:checked')].map(c => c.value));
+}
+
+async function loadStops() {
+  const res = await fetch('api/stops');
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || res.statusText);
+  stopMarkers = data.stops.map(stop => {
+    const cats = new Set(stop.cats.map(cssClass));
+    const lines = stop.lines.length ? `<br>${stop.lines.join(', ')}` : '';
+    return {
+      cats,
+      lines: stop.lines.map(l => l.toLowerCase()),
+      marker: L.circleMarker([stop.lat, stop.lon], { radius: 4, weight: 2, color: '#fff', fillOpacity: 1 })
+        .bindPopup(`<b>${stop.name}</b>${lines}`),
+    };
+  });
+}
+
+function drawStops() {
+  stopLayer.clearLayers();
+  const cats = stopCats();
+  if (!cats.size || map.getZoom() < STOP_ZOOM) return;
+  const f = filters();
+  for (const entry of stopMarkers) {
+    const hit = ['rail', 'tram', 'bus'].find(c => cats.has(c) && entry.cats.has(c));
+    if (!hit) continue;
+    if (f.lines && !entry.lines.some(l => f.lines.includes(l))) continue;
+    entry.marker.setStyle({ fillColor: STOP_COLOURS[hit] });
+    stopLayer.addLayer(entry.marker);
+  }
+}
+
+async function toggleStops() {
+  if (!stopCats().size) { map.removeLayer(stopLayer); stopLayer.clearLayers(); return; }
+  if (!stopMarkers.length) {
+    status.textContent = 'loading stops …';
+    try {
+      await loadStops();
+    } catch (err) {
+      status.textContent = `Stops: ${err.message}`;
+      status.classList.add('error');
+      return;
+    }
+  }
+  map.addLayer(stopLayer);
+  drawStops();
+  if (lastPayload) render(lastPayload);
+}
+
+async function refreshNetwork() {
+  if (!netCats().size) return;
+  try {
+    await loadNetwork();
+    drawNetwork();
+    if (lastPayload) render(lastPayload);
+  } catch (err) { /* retry next tick */ }
+}
+
+async function toggleNetwork() {
+  if (!netCats().size) { map.removeLayer(networkLayer); networkLayer.clearLayers(); return; }
+  status.textContent = 'loading route geometry …';
+  try {
+    if (!networkLines.size) await loadNetwork();
+    map.addLayer(networkLayer);
+    drawNetwork();
+    if (lastPayload) render(lastPayload);
+  } catch (err) {
+    status.textContent = `Routes: ${err.message}`;
+    status.classList.add('error');
+  }
+}
+
+function toggleAlerts() {
+  const on = document.getElementById('showAlerts').checked;
+  alertList.style.display = on ? 'block' : 'none';
+  if (on) { map.addLayer(alertLayer); refreshAlerts(); } else { map.removeLayer(alertLayer); }
+}
+
+function schedule() {
+  clearInterval(pollTimer);
+  refresh();
+  pollTimer = setInterval(refresh, POLL_MS);
+}
+
+const PREFS_KEY = 'kvb-map-filters';
+let prefControls;
+const prefKey = el => el.id || `${el.className}:${el.value}`;
+
+function savePrefs() {
+  const prefs = {};
+  for (const el of prefControls) prefs[prefKey(el)] = el.type === 'checkbox' ? el.checked : el.value;
+  try { localStorage.setItem(PREFS_KEY, JSON.stringify(prefs)); } catch (err) { /* private mode */ }
+}
+
+function loadPrefs() {
+  let prefs;
+  try { prefs = JSON.parse(localStorage.getItem(PREFS_KEY) || '{}'); } catch (err) { return; }
+  for (const el of prefControls) {
+    const v = prefs[prefKey(el)];
+    if (v === undefined) continue;
+    if (el.type === 'checkbox') el.checked = v; else el.value = v;
+  }
+}
+
+async function init() {
+  let cfg = { default_map_center: { lat: 50.9375, lon: 6.9603 }, default_zoom: 13,
+              vehicle_poll_cache_ttl_seconds: 15, alert_cache_ttl_seconds: 300 };
+  try {
+    const res = await fetch('api/config');
+    if (res.ok) cfg = await res.json();
+  } catch (err) { /* fall back to defaults above */ }
+  POLL_MS = (cfg.vehicle_poll_cache_ttl_seconds || 15) * 1000;
+  ALERT_POLL_MS = (cfg.alert_cache_ttl_seconds || 300) * 1000;
+
+  map = L.map('map').setView([cfg.default_map_center.lat, cfg.default_map_center.lon], cfg.default_zoom || 13);
+  L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    maxZoom: 19, attribution: '&copy; OpenStreetMap'
+  }).addTo(map);
+  networkLayer = L.layerGroup();
+  stopLayer = L.layerGroup();
+  vehicleLayer = L.layerGroup().addTo(map);
+  alertLayer = L.layerGroup();
+
+  status = document.getElementById('status');
+  alertList = document.getElementById('alertlist');
+  prefControls = [...document.querySelectorAll('#controls input')];
+
+  document.getElementById('lines').addEventListener('input', refilter);
+  document.getElementById('onlyLate').addEventListener('change', refilter);
+  document.querySelectorAll('.cat').forEach(c => c.addEventListener('change', () => {
+    const stops = document.querySelector(`.stopcat[value="${c.value}"]`);
+    const net = document.querySelector(`.netcat[value="${c.value}"]`);
+    if (!c.checked && stops.checked) { stops.checked = false; savePrefs(); toggleStops(); }
+    if (!c.checked && net.checked) { net.checked = false; savePrefs(); toggleNetwork(); }
+    refilter();
+  }));
+  document.getElementById('showAlerts').addEventListener('change', toggleAlerts);
+  document.querySelectorAll('.stopcat').forEach(c => c.addEventListener('change', toggleStops));
+  document.querySelectorAll('.netcat').forEach(c => c.addEventListener('change', toggleNetwork));
+  prefControls.forEach(el => el.addEventListener('change', savePrefs));
+  document.getElementById('lines').addEventListener('input', savePrefs);
+  map.on('moveend', () => { clearTimeout(moveTimer); moveTimer = setTimeout(schedule, 400); });
+  map.on('zoomend', drawStops);
+
+  loadPrefs();
+  schedule();
+  toggleAlerts();
+  toggleNetwork();
+  toggleStops();
+  setInterval(refreshAlerts, ALERT_POLL_MS);
+  setInterval(refreshNetwork, NETWORK_POLL_MS);
+  requestAnimationFrame(animate);
+}
+
+init();
+</script>
+</body>
+</html>
