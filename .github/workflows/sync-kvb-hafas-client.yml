@@ -1,0 +1,78 @@
+name: Sync kvb-hafas-client
+
+# Triggered by kvb-hafas-client's notify-kvb-ha-map.yml on every push to its
+# main. Re-locks the unpinned git dependency; if that actually moved uv.lock,
+# bumps the patch version, commits, tags and releases automatically.
+on:
+  repository_dispatch:
+    types: [kvb-hafas-client-updated]
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+
+      - name: Re-lock kvb-hafas-client
+        run: uv lock --upgrade-package kvb-hafas-client
+
+      - name: Check for changes
+        id: diff
+        run: |
+          if git diff --quiet -- uv.lock; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Bump patch version
+        if: steps.diff.outputs.changed == 'true'
+        id: bump
+        run: |
+          current=$(grep -m1 '^version:' config.yaml | sed -E 's/version: *"([0-9]+\.[0-9]+\.[0-9]+)"/\1/')
+          IFS='.' read -r major minor patch <<< "$current"
+          next="$major.$minor.$((patch + 1))"
+          sed -i "s/^version: \"$current\"/version: \"$next\"/" config.yaml
+          sed -i "s/^version = \"$current\"/version = \"$next\"/" pyproject.toml
+          echo "next=$next" >> "$GITHUB_OUTPUT"
+
+      - name: Update CHANGELOG
+        if: steps.diff.outputs.changed == 'true'
+        run: |
+          entry_date=$(date -u +%Y-%m-%d)
+          upstream_sha="${{ github.event.client_payload.sha }}"
+          upstream_line="Synced bundled UI/library to kvb-hafas-client${upstream_sha:+@${upstream_sha:0:7}}."
+          tmp=$(mktemp)
+          {
+            head -n 2 CHANGELOG.md
+            echo
+            echo "## [${{ steps.bump.outputs.next }}] - $entry_date"
+            echo
+            echo "### Changed"
+            echo "- $upstream_line"
+            tail -n +3 CHANGELOG.md
+          } > "$tmp"
+          mv "$tmp" CHANGELOG.md
+
+      - name: Commit, tag, release
+        if: steps.diff.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          NEXT: ${{ steps.bump.outputs.next }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add uv.lock config.yaml pyproject.toml CHANGELOG.md
+          git commit -m "chore: sync kvb-hafas-client, bump to $NEXT"
+          git tag "v$NEXT"
+          git push origin main "v$NEXT"
+          gh release create "v$NEXT" --title "v$NEXT" --notes "Synced bundled UI/library to a newer kvb-hafas-client commit. See [CHANGELOG.md](https://github.com/christoph-teichmeister/kvb-ha-map/blob/main/CHANGELOG.md)."
