@@ -17,6 +17,7 @@
   ul.stops li { padding: 8px 10px; background: #fff; border-radius: 6px; margin-bottom: 6px; cursor: pointer;
                 display: flex; justify-content: space-between; align-items: center; }
   ul.stops li:hover { background: #eef4fa; }
+  ul.stops li .stop-id { color: #999; font-size: 11px; font-family: monospace; margin-right: 8px; user-select: all; }
   ul.stops li .fav { cursor: pointer; color: #ccc; font-size: 16px; }
   ul.stops li .fav.active { color: #e6a700; }
   table { width: 100%; border-collapse: collapse; background: #fff; border-radius: 6px; overflow: hidden; }
@@ -87,13 +88,18 @@ function renderStopList(container, stops) {
     const li = document.createElement('li');
     const label = document.createElement('span');
     label.textContent = s.name;
+    label.title = `ext_id: ${s.ext_id} (use this in the favorite_stop_ids option)`;
     label.addEventListener('click', () => loadBoard(s.ext_id, s.name));
+    const id = document.createElement('span');
+    id.className = 'stop-id';
+    id.textContent = s.ext_id;
     const star = document.createElement('span');
     star.className = 'fav' + (favs.has(s.ext_id) ? ' active' : '');
     star.textContent = favs.has(s.ext_id) ? '★' : '☆';
     star.title = 'toggle favorite';
     star.addEventListener('click', (e) => { e.stopPropagation(); toggleFav(s.ext_id, s.name); });
     li.appendChild(label);
+    li.appendChild(id);
     li.appendChild(star);
     container.appendChild(li);
   }

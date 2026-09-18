@@ -444,8 +444,9 @@ async function init() {
   ALERT_POLL_MS = (cfg.alert_cache_ttl_seconds || 300) * 1000;
 
   map = L.map('map').setView([cfg.default_map_center.lat, cfg.default_map_center.lon], cfg.default_zoom || 13);
-  L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    maxZoom: 19, attribution: '&copy; OpenStreetMap'
+  L.tileLayer(cfg.tile_url || 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+    maxZoom: 19, subdomains: 'abcd',
+    attribution: cfg.tile_attribution || '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
   }).addTo(map);
   networkLayer = L.layerGroup();
   stopLayer = L.layerGroup();

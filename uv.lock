@@ -169,7 +169,7 @@ wheels = [
 
 [[package]]
 name = "kvb-ha-map"
-version = "0.1.0"
+version = "0.1.2"
 source = { virtual = "." }
 dependencies = [
     { name = "kvb-hafas-client" },

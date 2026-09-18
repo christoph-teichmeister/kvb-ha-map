@@ -52,8 +52,23 @@ just to keep history.
    `/addons/kvb-ha-map` on the HA host if you're not using a Git repo app
    store).
 2. Refresh the store, find **KVB Live Map** under "Local apps", install it.
-3. Configure options (see below), then **Start**. The app's panel appears
-   in the HA sidebar via Ingress — no exposed port, no separate auth needed.
+3. Configure options (see below), then **Start**. The app's panel should
+   appear in the HA sidebar via Ingress. If it doesn't, open the app's info
+   page in **Settings → Apps** and toggle **Show in sidebar** — newer HA
+   versions leave this off by default even for ingress-enabled apps.
+
+## Map tiles: OpenStreetMap usage policy
+
+The map defaults to [CARTO](https://carto.com/attributions)'s free Voyager
+basemap (`{s}.basemaps.cartocdn.com`), not `tile.openstreetmap.org`
+directly. OSM's [tile usage policy](https://operations.osmfoundation.org/policies/tiles/)
+explicitly disallows embedding their raw tile servers in an app that gets
+installed on many different machines — that pattern gets flagged and
+**blocked** ("Access blocked... not following the tile usage policy"), which
+is exactly what happens if you point `tile_url` back at
+`tile.openstreetmap.org`. Use `tile_url`/`tile_attribution` to point at a
+different provider (e.g. a MapTiler/Stadia/Thunderforest API key, or your
+own tile server) if CARTO's free tier isn't enough for your usage.
 
 ## App options
 
@@ -67,8 +82,10 @@ just to keep history.
 | `alert_cache_ttl_seconds` | `300` | Cache TTL for `/api/alerts`. |
 | `default_map_center_lat` / `_lon` | Cologne center | Initial map view. |
 | `default_zoom` | `13` | Initial map zoom. |
-| `favorite_stop_ids` | `[]` | Stop `ext_id`s shown as favorites on the departures page. |
+| `favorite_stop_ids` | `[]` | Stop `ext_id`s shown as favorites on the departures page — **not** stop names; use the search box on the Departures page and copy the small grey id shown next to each result (also toggleable there via the star icon, which stores favorites in browser localStorage instead). |
 | `dashboard_refresh_seconds` | `15` | Auto-refresh interval for the dashboard page. |
+| `tile_url` | CARTO Voyager | Leaflet tile URL template (`{s}`/`{z}`/`{x}`/`{y}`/`{r}`). Leave empty to use the default. |
+| `tile_attribution` | CARTO/OSM | Attribution HTML shown on the map for the tile source above. |
 
 ## Standalone / local development (no Home Assistant)
 

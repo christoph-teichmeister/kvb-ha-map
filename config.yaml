@@ -1,6 +1,6 @@
 ---
 name: "KVB Live Map"
-version: "0.1.1"
+version: "0.1.2"
 slug: "kvb_ha_map"
 description: "Live map of KVB (Köln) vehicles, stop departures and history/stats — unofficial companion add-on for kvb-hafas-client."
 url: "https://github.com/christoph-teichmeister/kvb-ha-map"
@@ -31,6 +31,8 @@ options:
   default_zoom: 13
   favorite_stop_ids: []
   dashboard_refresh_seconds: 15
+  tile_url: ""
+  tile_attribution: ""
 schema:
   history_enabled: bool
   history_sample_interval_seconds: int(5,3600)
@@ -44,3 +46,5 @@ schema:
   favorite_stop_ids:
     - "str"
   dashboard_refresh_seconds: int(1,600)
+  tile_url: "str?"
+  tile_attribution: "str?"

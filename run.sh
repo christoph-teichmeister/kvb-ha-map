@@ -27,11 +27,13 @@ if [ -f "$OPTIONS_FILE" ]; then
   DEFAULT_ZOOM=$(json_get '.default_zoom')
   FAVORITE_STOP_IDS=$(jq -c '.favorite_stop_ids // []' "$OPTIONS_FILE" 2>/dev/null || echo '[]')
   DASHBOARD_REFRESH_SECONDS=$(json_get '.dashboard_refresh_seconds')
+  TILE_URL=$(json_get '.tile_url')
+  TILE_ATTRIBUTION=$(json_get '.tile_attribution')
 
   export HISTORY_ENABLED HISTORY_SAMPLE_INTERVAL_SECONDS HISTORY_RETENTION_DAYS \
     HISTORY_FILTER_LOCAL_ONLY VEHICLE_POLL_CACHE_TTL_SECONDS ALERT_CACHE_TTL_SECONDS \
     DEFAULT_MAP_CENTER_LAT DEFAULT_MAP_CENTER_LON DEFAULT_ZOOM FAVORITE_STOP_IDS \
-    DASHBOARD_REFRESH_SECONDS
+    DASHBOARD_REFRESH_SECONDS TILE_URL TILE_ATTRIBUTION
 else
   echo "[run.sh] ${OPTIONS_FILE} not found — running with server.py built-in defaults (standalone/dev mode)"
 fi

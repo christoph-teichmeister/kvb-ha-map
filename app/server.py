@@ -105,6 +105,8 @@ DEFAULT_MAP_CENTER_LON = _env_float("DEFAULT_MAP_CENTER_LON", 6.9603)
 DEFAULT_ZOOM = _env_int("DEFAULT_ZOOM", 13)
 FAVORITE_STOP_IDS = _env_list("FAVORITE_STOP_IDS", [])
 DASHBOARD_REFRESH_SECONDS = _env_int("DASHBOARD_REFRESH_SECONDS", 15)
+TILE_URL = os.environ.get("TILE_URL") or ""
+TILE_ATTRIBUTION = os.environ.get("TILE_ATTRIBUTION") or ""
 
 APP_DIR = Path(__file__).parent
 STATIC_DIR = APP_DIR / "static"
@@ -473,6 +475,8 @@ class Handler(BaseHTTPRequestHandler):
             "history_enabled": HISTORY_ENABLED,
             "track_seconds": TRACK_SECONDS,
             "late_from_minutes": LATE_FROM,
+            "tile_url": TILE_URL,
+            "tile_attribution": TILE_ATTRIBUTION,
         }
 
     def _file(self, path: Path, ctype: str) -> None:
