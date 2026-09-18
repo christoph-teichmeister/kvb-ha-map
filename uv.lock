@@ -185,7 +185,7 @@ requires-dist = [
 [[package]]
 name = "kvb-hafas-client"
 version = "0.1.0"
-source = { git = "https://github.com/christoph-teichmeister/kvb-hafas-client.git#120fe9fc0967aee663775b39447ab7b4f3d18a47" }
+source = { git = "https://github.com/christoph-teichmeister/kvb-hafas-client.git#4209054d0b46d213b66a002b1f8717a544ebf893" }
 dependencies = [
     { name = "requests" },
 ]

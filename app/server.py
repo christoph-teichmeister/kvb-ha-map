@@ -29,18 +29,19 @@ import time
 from collections import deque
 from dataclasses import asdict
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from importlib import resources
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
-sys.path.insert(0, str(Path(__file__).parent))  # allow `import is_kvb_local`, `import stats` etc.
+sys.path.insert(0, str(Path(__file__).parent))  # allow `import history_store`, `import stats`
 
 from history_store import HistoryStore
-from is_kvb_local import is_kvb_local
 from stats import live_stats
 
 try:
     from kvb_hafas import KVBHafasClient, KVBHafasError
     from kvb_hafas.parsing import station_ext_id
+    from kvb_hafas.webui import is_kvb_local
 except ImportError as exc:  # pragma: no cover - fails fast & loud, not silently
     print(f"FATAL: kvb-hafas-client not installed ({exc}). pip install -r requirements.txt", file=sys.stderr)
     raise
@@ -109,8 +110,7 @@ TILE_URL = os.environ.get("TILE_URL") or ""
 TILE_ATTRIBUTION = os.environ.get("TILE_ATTRIBUTION") or ""
 
 APP_DIR = Path(__file__).parent
-STATIC_DIR = APP_DIR / "static"
-VENDOR_DIR = STATIC_DIR / "vendor"
+WEBUI = resources.files("kvb_hafas.webui")
 DATA_DIR = Path(os.environ.get("DATA_DIR", str(APP_DIR.parent / "data")))
 GEOMETRY_FILE = DATA_DIR / "map_geometry.json"
 RAIL_FILE = DATA_DIR / "rail_geometry.json"
@@ -435,13 +435,13 @@ class Handler(BaseHTTPRequestHandler):
         path = url.path
 
         if path in ("/", "/index.html"):
-            self._file(STATIC_DIR / "index.html", "text/html; charset=utf-8")
+            self._file("index.html", "text/html; charset=utf-8")
         elif path in STATIC_FILES:
-            self._file(STATIC_DIR / path.lstrip("/"), "text/html; charset=utf-8")
+            self._file(path.lstrip("/"), "text/html; charset=utf-8")
         elif path.startswith("/vendor/"):
             self._vendor(path[len("/vendor/") :])
         elif path == "/shared.css":
-            self._file(STATIC_DIR / "shared.css", "text/css; charset=utf-8")
+            self._file("shared.css", "text/css; charset=utf-8")
         elif path == "/api/config":
             self._json(200, self._config_payload())
         elif path == "/api/vehicles":
@@ -487,21 +487,26 @@ class Handler(BaseHTTPRequestHandler):
             "tile_attribution": TILE_ATTRIBUTION,
         }
 
-    def _file(self, path: Path, ctype: str) -> None:
+    def _file(self, name: str, ctype: str) -> None:
         try:
-            body = path.read_bytes()
+            body = WEBUI.joinpath(name).read_bytes()
         except OSError:
             self._json(404, {"error": "not found"})
             return
         self._send(200, ctype, body)
 
     def _vendor(self, rel: str) -> None:
-        path = (VENDOR_DIR / rel).resolve()
-        if not path.is_relative_to(VENDOR_DIR) or not path.is_file():
+        if not rel or rel.startswith("/") or ".." in Path(rel).parts:
             self._json(404, {"error": "not found"})
             return
-        ctype = mimetypes.guess_type(path.name)[0] or "application/octet-stream"
-        self._send(200, ctype, path.read_bytes(), cache="public, max-age=31536000, immutable")
+        target = WEBUI.joinpath("vendor", rel)
+        try:
+            body = target.read_bytes()
+        except (OSError, IsADirectoryError):
+            self._json(404, {"error": "not found"})
+            return
+        ctype = mimetypes.guess_type(rel)[0] or "application/octet-stream"
+        self._send(200, ctype, body, cache="public, max-age=31536000, immutable")
 
     def _vehicles_route(self, raw_bbox: str) -> None:
         try:

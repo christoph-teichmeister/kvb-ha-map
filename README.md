@@ -109,6 +109,11 @@ list and defaults.
 
 ## Repository layout
 
+This repo is the HA add-on shell only — the web UI (HTML/CSS/vendored
+Leaflet) lives in
+[kvb-hafas-client](https://github.com/christoph-teichmeister/kvb-hafas-client)'s
+`kvb_hafas.webui` package and is loaded at runtime via `importlib.resources`.
+
 ```
 config.yaml       HA app manifest (options schema, ingress config)
 Dockerfile         App image build
@@ -118,13 +123,10 @@ uv.lock            Locked dependency versions for reproducible builds
 app/
   server.py         stdlib http.server app: vehicle/alert/network/stop APIs,
                      stop search + departures, live/historical stats,
-                     HA Ingress-safe (relative URLs throughout)
+                     HA Ingress-safe (relative URLs throughout), serves
+                     kvb_hafas.webui's pages/assets via importlib.resources
   history_store.py   SQLite vehicle_observations table + queries
   stats.py            live snapshot stats + delegate to history_store
-  is_kvb_local.py      port of map.html's cssClass() bucketing helper
-  static/
-    index.html, map.html, departures.html, dashboard.html
-    vendor/            vendored Leaflet (from kvb-hafas-client)
 data/
   rail_geometry.json  OSM-derived rail geometry (from kvb-hafas-client)
 ```

@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from is_kvb_local import css_class, is_kvb_local
+from kvb_hafas.webui.is_kvb_local import css_class, is_kvb_local
 
 
 def live_stats(vehicles: list[dict[str, Any]], late_from: int = 3) -> dict[str, Any]:
