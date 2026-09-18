@@ -1,6 +1,6 @@
 # kvb-ha-map
 
-Home Assistant Supervisor Add-on: a live map of **KVB** (Kölner
+Home Assistant Supervisor App: a live map of **KVB** (Kölner
 Verkehrs-Betriebe, Cologne public transit) vehicles, plus a stop
 departure board and vehicle-history/delay stats — built on top of the
 [`kvb-hafas-client`](https://github.com/christoph-teichmeister/kvb-hafas-client)
@@ -8,7 +8,7 @@ Python library.
 
 ## ⚠️ Unofficial, use at your own risk
 
-This add-on depends entirely on `kvb-hafas-client`, itself an **unofficial**,
+This app depends entirely on `kvb-hafas-client`, itself an **unofficial**,
 reverse-engineered client for KVB's HAFAS backend — not an officially
 published API. The same caveats apply here:
 
@@ -21,7 +21,7 @@ published API. The same caveats apply here:
 - Don't use KVB branding/logos in derived work.
 - If in doubt, contact KVB directly and ask for official access.
 
-This add-on adds no authentication, no multi-user accounts and no
+This app adds no authentication, no multi-user accounts and no
 notifications — it is a single-user local dashboard, matching the scope of
 the source prototype it's built from.
 
@@ -35,27 +35,27 @@ the source prototype it's built from.
   delay, platform, cancellations).
 - **Dashboard** (`dashboard.html`) — live fleet stats (busiest line, current
   max delay, delayed-vehicle count) and historical stats aggregated from this
-  add-on's own vehicle-history database (least-punctual lines, average delay
+  app's own vehicle-history database (least-punctual lines, average delay
   per line, punctuality rate).
 
-Unlike the source prototype, this add-on persists every vehicle position it
+Unlike the source prototype, this app persists every vehicle position it
 polls into a local **SQLite** database (`vehicle_observations`), separate
 from Home Assistant's own Recorder (which isn't built for this kind of
 high-frequency sampling). History sampling reuses whatever the last
 `/api/vehicles` poll already fetched — it never makes an extra KVB request
 just to keep history.
 
-## Installing as a Home Assistant Add-on
+## Installing as a Home Assistant App
 
-1. In Home Assistant: **Settings → Add-ons → Add-on Store → ⋮ → Repositories**,
+1. In Home Assistant: **Settings → Apps → App Store → ⋮ → Repositories**,
    add the URL of this repo (or add it as a local folder under
-   `/addons/kvb-ha-map` on the HA host if you're not using a Git repo add-on
+   `/addons/kvb-ha-map` on the HA host if you're not using a Git repo app
    store).
-2. Refresh the store, find **KVB Live Map** under "Local add-ons", install it.
-3. Configure options (see below), then **Start**. The add-on's panel appears
+2. Refresh the store, find **KVB Live Map** under "Local apps", install it.
+3. Configure options (see below), then **Start**. The app's panel appears
    in the HA sidebar via Ingress — no exposed port, no separate auth needed.
 
-## Add-on options
+## App options
 
 | Option | Default | Description |
 | --- | --- | --- |
@@ -88,8 +88,8 @@ list and defaults.
 ## Repository layout
 
 ```
-config.yaml       HA add-on manifest (options schema, ingress config)
-Dockerfile         Add-on image build
+config.yaml       HA app manifest (options schema, ingress config)
+Dockerfile         App image build
 run.sh             Entrypoint: options.json -> env vars -> server.py
 pyproject.toml     Project + deps (kvb-hafas-client from GitHub, requests), managed via uv
 uv.lock            Locked dependency versions for reproducible builds
