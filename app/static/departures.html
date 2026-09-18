@@ -4,62 +4,56 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>KVB Departures</title>
-<style>
-  html, body { margin: 0; font: 14px/1.4 system-ui, sans-serif; background: #f4f4f4; color: #222; }
-  header { background: #fff; padding: 10px 16px; box-shadow: 0 1px 4px rgba(0,0,0,.1); position: sticky; top: 0; }
-  header a { color: #06c; text-decoration: none; margin-right: 12px; font-size: 12px; }
-  main { max-width: 720px; margin: 0 auto; padding: 16px; }
-  h2 { font-size: 15px; margin: 18px 0 8px; }
-  .search { display: flex; gap: 8px; }
-  .search input { flex: 1; padding: 8px 10px; border: 1px solid #ccc; border-radius: 6px; font-size: 14px; }
-  .search button { padding: 8px 14px; border: none; border-radius: 6px; background: #06c; color: #fff; cursor: pointer; }
-  ul.stops { list-style: none; margin: 8px 0; padding: 0; }
-  ul.stops li { padding: 8px 10px; background: #fff; border-radius: 6px; margin-bottom: 6px; cursor: pointer;
-                display: flex; justify-content: space-between; align-items: center; }
-  ul.stops li:hover { background: #eef4fa; }
-  ul.stops li .stop-id { color: #999; font-size: 11px; font-family: monospace; margin-right: 8px; user-select: all; }
-  ul.stops li .fav { cursor: pointer; color: #ccc; font-size: 16px; }
-  ul.stops li .fav.active { color: #e6a700; }
-  table { width: 100%; border-collapse: collapse; background: #fff; border-radius: 6px; overflow: hidden; }
-  th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid #eee; font-size: 13px; }
-  th { background: #f0f4f8; font-weight: 600; }
-  tr.cancelled td { text-decoration: line-through; color: #999; }
-  .delay-pos { color: #c00; font-weight: 600; }
-  .delay-neg { color: #080; }
-  .empty { color: #888; padding: 10px; }
-  #boardTitle { font-weight: 600; }
-  .err { color: #900; padding: 8px; background: #fee; border-radius: 6px; }
-</style>
+<link rel="stylesheet" href="shared.css">
 </head>
 <body>
-<header>
-  <a href="index.html">Home</a><a href="map.html">Map</a><a href="dashboard.html">Dashboard</a>
+<header class="app-header">
+  <a class="brand" href="index.html"><span class="dot"></span>KVB Live</a>
+  <nav>
+    <a href="index.html">Home</a>
+    <a href="map.html">Map</a>
+    <a href="departures.html" class="active">Abfahrten</a>
+    <a href="dashboard.html">Dashboard</a>
+  </nav>
 </header>
 <main>
-  <h2>Search stops</h2>
+  <h1>Abfahrten</h1>
+
+  <h2>Haltestelle suchen</h2>
   <div class="search">
-    <input type="text" id="query" placeholder="e.g. Neumarkt">
-    <button id="searchBtn">Search</button>
+    <input type="text" id="query" placeholder="z.B. Neumarkt">
+    <button id="searchBtn">Suchen</button>
   </div>
   <ul class="stops" id="results"></ul>
 
-  <h2>Favorites</h2>
+  <h2>Favoriten</h2>
   <ul class="stops" id="favorites"></ul>
 
-  <h2><span id="boardTitle">Departures</span></h2>
-  <div id="board"><div class="empty">Search for a stop or pick a favorite above.</div></div>
+  <h2>Abfahrtstafel</h2>
+  <div id="board" class="led-board"><div class="led-empty">Haltestelle suchen oder Favorit oben auswählen.</div></div>
 </main>
 <script>
 const FAV_KEY = 'kvb-departures-favorites';
+const FAV_NAMES_KEY = 'kvb-departures-favorite-names';
+const WEEKDAYS = ['Sonntag', 'Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag'];
 let cfg = { favorite_stop_ids: [] };
 let currentStopId = null, currentStopName = null;
-let boardTimer = null;
+let boardTimer = null, countdownTimer = null, clockTimer = null;
+let boardDepartures = [];
 
 function loadLocalFavs() {
   try { return JSON.parse(localStorage.getItem(FAV_KEY) || '[]'); } catch { return []; }
 }
 function saveLocalFavs(list) {
   try { localStorage.setItem(FAV_KEY, JSON.stringify(list)); } catch { /* private mode */ }
+}
+function loadFavNames() {
+  try { return JSON.parse(localStorage.getItem(FAV_NAMES_KEY) || '{}'); } catch { return {}; }
+}
+function saveFavName(id, name) {
+  const names = loadFavNames();
+  names[id] = name;
+  try { localStorage.setItem(FAV_NAMES_KEY, JSON.stringify(names)); } catch { /* private mode */ }
 }
 
 function favIds() {
@@ -69,7 +63,7 @@ function favIds() {
 
 function toggleFav(id, name) {
   const local = new Set(loadLocalFavs());
-  if (local.has(id)) local.delete(id); else local.add(id);
+  if (local.has(id)) local.delete(id); else { local.add(id); saveFavName(id, name); }
   saveLocalFavs([...local]);
   renderFavorites();
   renderResultsCache();
@@ -88,7 +82,7 @@ function renderStopList(container, stops) {
     const li = document.createElement('li');
     const label = document.createElement('span');
     label.textContent = s.name;
-    label.title = `ext_id: ${s.ext_id} (use this in the favorite_stop_ids option)`;
+    label.title = `ext_id: ${s.ext_id} (für die favorite_stop_ids-Option)`;
     label.addEventListener('click', () => loadBoard(s.ext_id, s.name));
     const id = document.createElement('span');
     id.className = 'stop-id';
@@ -96,7 +90,7 @@ function renderStopList(container, stops) {
     const star = document.createElement('span');
     star.className = 'fav' + (favs.has(s.ext_id) ? ' active' : '');
     star.textContent = favs.has(s.ext_id) ? '★' : '☆';
-    star.title = 'toggle favorite';
+    star.title = 'Favorit umschalten';
     star.addEventListener('click', (e) => { e.stopPropagation(); toggleFav(s.ext_id, s.name); });
     li.appendChild(label);
     li.appendChild(id);
@@ -109,14 +103,14 @@ async function search() {
   const q = document.getElementById('query').value.trim();
   const results = document.getElementById('results');
   if (!q) { results.innerHTML = ''; return; }
-  results.innerHTML = '<li class="empty">searching …</li>';
+  results.innerHTML = '<li class="empty">suche …</li>';
   try {
     const res = await fetch(`api/stops/search?q=${encodeURIComponent(q)}`);
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || res.statusText);
     lastResults = data.stops || [];
     renderResultsCache();
-    if (!lastResults.length) results.innerHTML = '<li class="empty">no matches</li>';
+    if (!lastResults.length) results.innerHTML = '<li class="empty">keine Treffer</li>';
   } catch (err) {
     results.innerHTML = `<li class="err">${err.message}</li>`;
   }
@@ -125,19 +119,18 @@ async function search() {
 async function renderFavorites() {
   const container = document.getElementById('favorites');
   const ids = [...favIds()];
-  if (!ids.length) { container.innerHTML = '<li class="empty">no favorites yet — star a stop above</li>'; return; }
-  // We only have ids for configured favorites, no names — resolve via search-by-id
-  // is not supported by the API, so show the id itself; clicking still loads the board.
+  if (!ids.length) { container.innerHTML = '<li class="empty">noch keine Favoriten — Haltestelle oben markieren</li>'; return; }
+  const names = loadFavNames();
   container.innerHTML = '';
   for (const id of ids) {
     const li = document.createElement('li');
     const label = document.createElement('span');
-    label.textContent = id;
-    label.addEventListener('click', () => loadBoard(id, id));
+    label.textContent = names[id] || id;
+    label.addEventListener('click', () => loadBoard(id, names[id] || id));
     const star = document.createElement('span');
     star.className = 'fav active';
     star.textContent = '★';
-    star.addEventListener('click', (e) => { e.stopPropagation(); toggleFav(id, id); });
+    star.addEventListener('click', (e) => { e.stopPropagation(); toggleFav(id, names[id] || id); });
     li.appendChild(label);
     li.appendChild(star);
     container.appendChild(li);
@@ -150,29 +143,72 @@ function fmtTime(hafas) {
   return `${t.slice(0, 2)}:${t.slice(2, 4)}`;
 }
 
+function minutesUntil(hafas) {
+  if (!hafas || hafas.length < 8) return null;
+  const now = new Date();
+  const h = parseInt(hafas.slice(-6, -4), 10), m = parseInt(hafas.slice(-4, -2), 10);
+  const target = new Date(now);
+  target.setHours(h, m, 0, 0);
+  let diff = Math.round((target - now) / 60000);
+  if (diff < -60) diff += 1440;
+  return diff;
+}
+
+function headDate() {
+  const now = new Date();
+  const dd = String(now.getDate()).padStart(2, '0');
+  const mm = String(now.getMonth() + 1).padStart(2, '0');
+  return `${WEEKDAYS[now.getDay()]} ${dd}.${mm}.${now.getFullYear()}`;
+}
+function headClock() {
+  const now = new Date();
+  return `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+}
+
 function renderBoard(data) {
   const board = document.getElementById('board');
-  const deps = data.departures || [];
-  if (!deps.length) { board.innerHTML = '<div class="empty">no departures</div>'; return; }
-  const rows = deps.map(d => {
-    const delay = d.delay_minutes;
-    const delayText = delay === null || delay === undefined ? '—'
-      : delay > 0 ? `<span class="delay-pos">+${delay}</span>`
-      : delay < 0 ? `<span class="delay-neg">${delay}</span>` : '0';
-    return `<tr class="${d.cancelled ? 'cancelled' : ''}">
-      <td>${d.line}</td>
-      <td>${d.direction}</td>
-      <td>${fmtTime(d.planned)}</td>
-      <td>${d.realtime ? fmtTime(d.realtime) : '—'}</td>
-      <td>${delayText}</td>
-      <td>${d.platform || '—'}</td>
-      <td>${d.cancelled ? 'cancelled' : ''}</td>
-    </tr>`;
+  boardDepartures = data.departures || [];
+  board.innerHTML = `<div class="led-head"><span id="ledDate">${headDate()}</span><span id="ledClock">${headClock()}</span></div>
+    <div id="boardRows"></div>
+    <div id="boardTicker"></div>`;
+  renderBoardRows();
+  clearInterval(clockTimer);
+  clockTimer = setInterval(() => {
+    const c = document.getElementById('ledClock');
+    if (c) c.textContent = headClock();
+  }, 1000);
+  loadTicker();
+}
+
+function renderBoardRows() {
+  const rows = document.getElementById('boardRows');
+  if (!rows) return;
+  if (!boardDepartures.length) { rows.innerHTML = '<div class="led-empty">keine Abfahrten</div>'; return; }
+  rows.innerHTML = boardDepartures.map(d => {
+    const eta = minutesUntil(d.realtime || d.planned);
+    const etaText = d.cancelled ? 'Entfällt' : eta === null ? '—' : eta <= 0 ? 'Sofort' : `${eta} Min`;
+    return `<div class="led-row${d.cancelled ? ' cancelled' : ''}">
+      <span class="led-num">${d.line}</span>
+      <span class="led-dest">${d.direction}</span>
+      <span class="led-track">${d.platform ? `Gleis ${d.platform}` : ''}</span>
+      <span class="led-eta">${etaText}</span>
+    </div>`;
   }).join('');
-  board.innerHTML = `<table>
-    <thead><tr><th>Line</th><th>Direction</th><th>Planned</th><th>Realtime</th><th>Delay</th><th>Platform</th><th></th></tr></thead>
-    <tbody>${rows}</tbody>
-  </table>`;
+}
+
+async function loadTicker() {
+  const box = document.getElementById('boardTicker');
+  if (!box) return;
+  try {
+    const res = await fetch('api/alerts');
+    if (!res.ok) { box.innerHTML = ''; return; }
+    const data = await res.json();
+    const relevant = (data.alerts || []).filter(a => !currentStopId || !a.stops?.length || a.stops.includes(currentStopId));
+    const text = relevant.map(a => a.text).filter(Boolean).join('   •   ');
+    box.innerHTML = text ? `<div class="led-ticker"><span class="track">${text}</span></div>` : '';
+  } catch (err) {
+    box.innerHTML = '';
+  }
 }
 
 async function refreshBoard() {
@@ -181,7 +217,8 @@ async function refreshBoard() {
     const res = await fetch(`api/departures?stop_id=${encodeURIComponent(currentStopId)}&max=15`);
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || res.statusText);
-    renderBoard(data);
+    boardDepartures = data.departures || [];
+    renderBoardRows();
   } catch (err) {
     document.getElementById('board').innerHTML = `<div class="err">${err.message}</div>`;
   }
@@ -190,10 +227,14 @@ async function refreshBoard() {
 function loadBoard(id, name) {
   currentStopId = id;
   currentStopName = name;
-  document.getElementById('boardTitle').textContent = `Departures — ${name}`;
   clearInterval(boardTimer);
+  clearInterval(countdownTimer);
+  clearInterval(clockTimer);
+  document.getElementById('board').innerHTML = '<div class="skeleton" style="height:140px;background:#050505"></div>';
+  renderBoard({ departures: [] });
   refreshBoard();
   boardTimer = setInterval(refreshBoard, 30000);
+  countdownTimer = setInterval(renderBoardRows, 15000);
 }
 
 async function init() {

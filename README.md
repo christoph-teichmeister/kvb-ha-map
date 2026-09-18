@@ -59,33 +59,36 @@ just to keep history.
 
 ## Map tiles: OpenStreetMap usage policy
 
-The map defaults to [CARTO](https://carto.com/attributions)'s free Voyager
-basemap (`{s}.basemaps.cartocdn.com`), not `tile.openstreetmap.org`
+The map defaults to [Wikimedia](https://wikimediafoundation.org/wiki/Maps_Terms_of_Use)'s
+free OSM-intl basemap (`maps.wikimedia.org/osm-intl`), not `tile.openstreetmap.org`
 directly. OSM's [tile usage policy](https://operations.osmfoundation.org/policies/tiles/)
 explicitly disallows embedding their raw tile servers in an app that gets
-installed on many different machines — that pattern gets flagged and
-**blocked** ("Access blocked... not following the tile usage policy"), which
+installed on many different machines — that pattern gets flagged and **blocked** ("Access blocked... not following the
+tile usage policy"), which
 is exactly what happens if you point `tile_url` back at
-`tile.openstreetmap.org`. Use `tile_url`/`tile_attribution` to point at a
-different provider (e.g. a MapTiler/Stadia/Thunderforest API key, or your
-own tile server) if CARTO's free tier isn't enough for your usage.
+`tile.openstreetmap.org`. CARTO's Voyager basemap used to be a free
+no-key alternative here too, but now requires an API key ("API key
+required" watermark), so it's no longer the default. Use
+`tile_url`/`tile_attribution` to point at a different provider (e.g. a
+MapTiler/Stadia/Thunderforest API key, or your own tile server) if
+Wikimedia's tiles aren't enough for your usage.
 
 ## App options
 
-| Option | Default | Description |
-| --- | --- | --- |
-| `history_enabled` | `true` | Persist vehicle observations to SQLite. |
-| `history_sample_interval_seconds` | `60` | How often to snapshot the fleet into history. |
-| `history_retention_days` | `365` | Delete observations older than this. |
-| `history_filter_local_only` | `true` | Only persist KVB tram/bus vehicles, not passing S-Bahn/RE/IC traffic. |
-| `vehicle_poll_cache_ttl_seconds` | `15` | Cache TTL for `/api/vehicles`. |
-| `alert_cache_ttl_seconds` | `300` | Cache TTL for `/api/alerts`. |
-| `default_map_center_lat` / `_lon` | Cologne center | Initial map view. |
-| `default_zoom` | `13` | Initial map zoom. |
-| `favorite_stop_ids` | `[]` | Stop `ext_id`s shown as favorites on the departures page — **not** stop names; use the search box on the Departures page and copy the small grey id shown next to each result (also toggleable there via the star icon, which stores favorites in browser localStorage instead). |
-| `dashboard_refresh_seconds` | `15` | Auto-refresh interval for the dashboard page. |
-| `tile_url` | CARTO Voyager | Leaflet tile URL template (`{s}`/`{z}`/`{x}`/`{y}`/`{r}`). Leave empty to use the default. |
-| `tile_attribution` | CARTO/OSM | Attribution HTML shown on the map for the tile source above. |
+| Option                            | Default        | Description                                                                                                                                                                                                                                                                      |
+|-----------------------------------|----------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `history_enabled`                 | `true`         | Persist vehicle observations to SQLite.                                                                                                                                                                                                                                          |
+| `history_sample_interval_seconds` | `60`           | How often to snapshot the fleet into history.                                                                                                                                                                                                                                    |
+| `history_retention_days`          | `365`          | Delete observations older than this.                                                                                                                                                                                                                                             |
+| `history_filter_local_only`       | `true`         | Only persist KVB tram/bus vehicles, not passing S-Bahn/RE/IC traffic.                                                                                                                                                                                                            |
+| `vehicle_poll_cache_ttl_seconds`  | `15`           | Cache TTL for `/api/vehicles`.                                                                                                                                                                                                                                                   |
+| `alert_cache_ttl_seconds`         | `300`          | Cache TTL for `/api/alerts`.                                                                                                                                                                                                                                                     |
+| `default_map_center_lat` / `_lon` | Cologne center | Initial map view.                                                                                                                                                                                                                                                                |
+| `default_zoom`                    | `13`           | Initial map zoom.                                                                                                                                                                                                                                                                |
+| `favorite_stop_ids`               | `[]`           | Stop `ext_id`s shown as favorites on the departures page — **not** stop names; use the search box on the Departures page and copy the small grey id shown next to each result (also toggleable there via the star icon, which stores favorites in browser localStorage instead). |
+| `dashboard_refresh_seconds`       | `15`           | Auto-refresh interval for the dashboard page.                                                                                                                                                                                                                                    |
+| `tile_url`                        | Wikimedia OSM  | Leaflet tile URL template (`{s}`/`{z}`/`{x}`/`{y}`/`{r}`). Leave empty to use the default.                                                                                                                                                                                       |
+| `tile_attribution`                | Wikimedia/OSM  | Attribution HTML shown on the map for the tile source above.                                                                                                                                                                                                                     |
 
 ## Standalone / local development (no Home Assistant)
 
@@ -97,8 +100,8 @@ uv sync
 uv run python3 app/server.py       # http://localhost:8099
 ```
 
-Env vars mirror the option names above, upper-cased
-(`HISTORY_ENABLED`, `VEHICLE_POLL_CACHE_TTL_SECONDS`, `FAVORITE_STOP_IDS` as a
+Env vars mirror the option names above, upper-cased (`HISTORY_ENABLED`, `VEHICLE_POLL_CACHE_TTL_SECONDS`,
+`FAVORITE_STOP_IDS` as a
 JSON array or comma-separated list, etc.) — see `app/server.py` for the exact
 list and defaults.
 

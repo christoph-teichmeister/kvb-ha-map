@@ -376,6 +376,10 @@ def _stops_search(query: str, max_results: int) -> dict:
     return {"stops": [asdict(s) for s in stops]}
 
 
+def _stop_details(stop_ext_id: str) -> dict:
+    return asdict(_client.stop_details(stop_ext_id))
+
+
 def _departures(stop_id: str, max_journeys: int) -> dict:
     deps = _client.station_board(stop_id, max_journeys=max_journeys)
     out = []
@@ -436,6 +440,8 @@ class Handler(BaseHTTPRequestHandler):
             self._file(STATIC_DIR / path.lstrip("/"), "text/html; charset=utf-8")
         elif path.startswith("/vendor/"):
             self._vendor(path[len("/vendor/") :])
+        elif path == "/shared.css":
+            self._file(STATIC_DIR / "shared.css", "text/css; charset=utf-8")
         elif path == "/api/config":
             self._json(200, self._config_payload())
         elif path == "/api/vehicles":
@@ -448,6 +454,8 @@ class Handler(BaseHTTPRequestHandler):
             self._guarded(_stops_payload)
         elif path == "/api/stops/search":
             self._stops_search_route(parse_qs(url.query))
+        elif path == "/api/stops/details":
+            self._stop_details_route(parse_qs(url.query))
         elif path == "/api/departures":
             self._departures_route(parse_qs(url.query))
         elif path == "/api/stats/live":
@@ -513,6 +521,13 @@ class Handler(BaseHTTPRequestHandler):
         except ValueError:
             max_results = 5
         self._guarded(lambda: _stops_search(q, max_results))
+
+    def _stop_details_route(self, query: dict) -> None:
+        ext_id = (query.get("ext_id", [""])[0]).strip()
+        if not ext_id:
+            self._json(400, {"error": "missing query parameter 'ext_id'"})
+            return
+        self._guarded(lambda: _stop_details(ext_id))
 
     def _departures_route(self, query: dict) -> None:
         stop_id = (query.get("stop_id", [""])[0]).strip()

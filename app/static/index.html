@@ -4,28 +4,88 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>KVB Live Map</title>
-<style>
-  html, body { margin: 0; height: 100%; font: 14px/1.4 system-ui, sans-serif; background: #f4f4f4; }
-  body { display: flex; align-items: center; justify-content: center; }
-  .card { background: #fff; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,.15); padding: 24px 28px; width: 320px; }
-  h1 { font-size: 18px; margin: 0 0 14px; }
-  nav { display: flex; flex-direction: column; gap: 10px; }
-  a.tile { display: block; padding: 12px 14px; border-radius: 8px; background: #f0f4f8; color: #124;
-           text-decoration: none; font-weight: 600; }
-  a.tile:hover { background: #e2ecf5; }
-  a.tile span { display: block; font-weight: 400; font-size: 12px; color: #567; margin-top: 2px; }
-  footer { margin-top: 16px; font-size: 11px; color: #888; }
-</style>
+<link rel="stylesheet" href="shared.css">
 </head>
 <body>
-<div class="card">
-  <h1>KVB Live Map</h1>
-  <nav>
-    <a class="tile" href="map.html">Live Map<span>Vehicles, network, service alerts</span></a>
-    <a class="tile" href="departures.html">Departures<span>Stop search &amp; live departure board</span></a>
-    <a class="tile" href="dashboard.html">Dashboard<span>Live &amp; historical stats</span></a>
+<header class="app-header">
+  <span class="brand"><span class="dot"></span>KVB Live</span>
+</header>
+<main>
+  <h1>Übersicht</h1>
+  <p class="subtitle">Live-Fahrzeuge, Abfahrten und Statistiken für den Kölner ÖPNV.</p>
+
+  <nav class="menu">
+    <a class="menu-row featured" href="departures.html">
+      <span class="menu-icon" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="4" y="4" width="16" height="16" rx="3"/><path d="M8 2v4M16 2v4M4 10h16"/>
+        </svg>
+      </span>
+      <span class="menu-row-body">
+        <span class="menu-row-title">Abfahrten</span>
+        <span class="menu-row-desc">Haltestellen suchen &amp; Live-Abfahrtstafel</span>
+        <span class="menu-row-preview" id="favPreview"></span>
+      </span>
+      <span class="menu-row-arrow" aria-hidden="true">&rsaquo;</span>
+    </a>
+    <a class="menu-row" href="map.html">
+      <span class="menu-icon" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M9 3 3 5v16l6-2 6 2 6-2V3l-6 2-6-2Z"/><path d="M9 3v16"/><path d="M15 5v16"/>
+        </svg>
+      </span>
+      <span class="menu-row-body">
+        <span class="menu-row-title">Live Map</span>
+        <span class="menu-row-desc">Fahrzeuge, Linien und Störungsmeldungen</span>
+      </span>
+      <span class="menu-row-arrow" aria-hidden="true">&rsaquo;</span>
+    </a>
+    <a class="menu-row" href="dashboard.html">
+      <span class="menu-icon" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M4 20V10M12 20V4M20 20v-7"/>
+        </svg>
+      </span>
+      <span class="menu-row-body">
+        <span class="menu-row-title">Dashboard</span>
+        <span class="menu-row-desc">Live- &amp; historische Statistiken</span>
+      </span>
+      <span class="menu-row-arrow" aria-hidden="true">&rsaquo;</span>
+    </a>
   </nav>
-  <footer>Unofficial companion add-on for kvb-hafas-client. Not affiliated with KVB.</footer>
-</div>
+</main>
+<footer class="app-footer">Inoffizieller Companion-Add-on für kvb-hafas-client. Keine Verbindung zur KVB.</footer>
+<script>
+function minutesUntil(hafas) {
+  if (!hafas || hafas.length < 8) return null;
+  const now = new Date();
+  const h = parseInt(hafas.slice(-6, -4), 10), m = parseInt(hafas.slice(-4, -2), 10);
+  const target = new Date(now);
+  target.setHours(h, m, 0, 0);
+  let diff = Math.round((target - now) / 60000);
+  if (diff < -60) diff += 1440;
+  return diff;
+}
+
+async function loadFavPreview() {
+  const el = document.getElementById('favPreview');
+  try {
+    const res = await fetch('api/config');
+    if (!res.ok) return;
+    const cfg = await res.json();
+    const id = (cfg.favorite_stop_ids || [])[0];
+    if (!id) return;
+    const dep = await fetch(`api/departures?stop_id=${encodeURIComponent(id)}&max=1`);
+    if (!dep.ok) return;
+    const data = await dep.json();
+    const next = (data.departures || [])[0];
+    if (!next) return;
+    const eta = minutesUntil(next.realtime || next.planned);
+    const etaText = next.cancelled ? 'entfällt' : eta === null ? '' : eta <= 0 ? 'sofort' : `${eta} min`;
+    el.textContent = `${next.line} → ${next.direction}${etaText ? ' · ' + etaText : ''}`;
+  } catch (err) { /* ignore, purely optional */ }
+}
+loadFavPreview();
+</script>
 </body>
 </html>
