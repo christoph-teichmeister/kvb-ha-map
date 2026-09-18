@@ -40,4 +40,4 @@ export DATA_DIR="${DATA_DIR:-/app/data}"
 export PORT="${PORT:-8099}"
 
 echo "[run.sh] starting KVB Live Map server on port ${PORT}"
-exec python3 /app/app/server.py
+exec python3 -u /app/app/server.py
