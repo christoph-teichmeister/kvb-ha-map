@@ -173,14 +173,10 @@ version = "2026.9.0"
 source = { virtual = "." }
 dependencies = [
     { name = "kvb-hafas-client" },
-    { name = "requests" },
 ]
 
 [package.metadata]
-requires-dist = [
-    { name = "kvb-hafas-client", git = "https://github.com/christoph-teichmeister/kvb-hafas-client.git" },
-    { name = "requests", specifier = ">=2.31" },
-]
+requires-dist = [{ name = "kvb-hafas-client", git = "https://github.com/christoph-teichmeister/kvb-hafas-client.git" }]
 
 [[package]]
 name = "kvb-hafas-client"

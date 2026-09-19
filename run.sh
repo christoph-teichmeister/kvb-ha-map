@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
 # Entrypoint for the HA Supervisor add-on. Reads /data/options.json (written by
 # Supervisor from config.yaml's `options`/`schema`) and exports it as env vars
-# consumed by app/server.py. Falls back to the same defaults server.py itself
-# uses when /data/options.json doesn't exist (e.g. local `docker run` without
-# Supervisor, or plain `python3 app/server.py` for standalone dev).
+# consumed by kvb_hafas.server.http_server (from the kvb-hafas-client
+# dependency — this add-on carries no server code of its own). Falls back to
+# that module's own defaults when /data/options.json doesn't exist (e.g. local
+# `docker run` without Supervisor, or plain standalone dev).
 set -euo pipefail
 
 OPTIONS_FILE="/data/options.json"
@@ -35,11 +36,11 @@ if [ -f "$OPTIONS_FILE" ]; then
     DEFAULT_MAP_CENTER_LAT DEFAULT_MAP_CENTER_LON DEFAULT_ZOOM FAVORITE_STOP_IDS \
     DASHBOARD_REFRESH_SECONDS TILE_URL TILE_ATTRIBUTION
 else
-  echo "[run.sh] ${OPTIONS_FILE} not found — running with server.py built-in defaults (standalone/dev mode)"
+  echo "[run.sh] ${OPTIONS_FILE} not found — running with kvb_hafas.server.http_server's built-in defaults (standalone/dev mode)"
 fi
 
 export DATA_DIR="${DATA_DIR:-/app/data}"
 export PORT="${PORT:-8099}"
 
 echo "[run.sh] starting KVB Live Map server on port ${PORT}"
-exec python3 -u /app/app/server.py
+exec python3 -u -m kvb_hafas.server.http_server
