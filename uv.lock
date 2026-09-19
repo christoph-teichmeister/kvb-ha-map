@@ -169,7 +169,7 @@ wheels = [
 
 [[package]]
 name = "kvb-ha-map"
-version = "2026.9.1"
+version = "2026.9.2"
 source = { virtual = "." }
 dependencies = [
     { name = "kvb-hafas-client" },
@@ -180,8 +180,8 @@ requires-dist = [{ name = "kvb-hafas-client", git = "https://github.com/christop
 
 [[package]]
 name = "kvb-hafas-client"
-version = "2026.9.2"
-source = { git = "https://github.com/christoph-teichmeister/kvb-hafas-client.git#96fec6b99a4e4cd880a360c205e52d928ad996d0" }
+version = "2026.9.3"
+source = { git = "https://github.com/christoph-teichmeister/kvb-hafas-client.git#3b82c96b4b2f082700ee756b7aa433fbdcc6ce70" }
 dependencies = [
     { name = "requests" },
 ]
