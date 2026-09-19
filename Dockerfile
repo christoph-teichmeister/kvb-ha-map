@@ -18,7 +18,6 @@ COPY --from=ghcr.io/astral-sh/uv:0.9-alpine /usr/local/bin/uv /usr/local/bin/uv
 COPY pyproject.toml uv.lock /app/
 RUN uv sync --frozen --no-dev
 
-COPY app /app/app
 COPY data /app/data
 COPY run.sh /app/run.sh
 RUN chmod a+x /app/run.sh

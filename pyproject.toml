@@ -7,7 +7,6 @@ license = "MIT"
 requires-python = ">=3.11"
 dependencies = [
     "kvb-hafas-client @ git+https://github.com/christoph-teichmeister/kvb-hafas-client.git",
-    "requests>=2.31",
 ]
 
 [tool.uv]

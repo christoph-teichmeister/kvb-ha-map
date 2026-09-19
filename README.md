@@ -1,10 +1,12 @@
 # kvb-ha-map
 
-Home Assistant Supervisor App: a live map of **KVB** (Kölner
-Verkehrs-Betriebe, Cologne public transit) vehicles, plus a stop
-departure board and vehicle-history/delay stats — built on top of the
-[`kvb-hafas-client`](https://github.com/christoph-teichmeister/kvb-hafas-client)
-Python library.
+Home Assistant Supervisor App wrapping
+[`kvb-hafas-client`](https://github.com/christoph-teichmeister/kvb-hafas-client)'s
+live map, stop departure board and vehicle-history/delay stats for Home
+Assistant. This repo carries no server or UI code of its own — it's a thin
+Docker/Ingress shell around `kvb_hafas.server.http_server`, imported directly
+from `kvb-hafas-client`. Server and UI are maintained only there; see that
+repo (`uv run map_server.py`) for local development.
 
 ## ⚠️ Unofficial, use at your own risk
 
@@ -29,7 +31,7 @@ the source prototype it's built from.
 
 - **Live Map** (`map.html`) — all KVB vehicles currently in view, animated
   between polls, with line/route geometry, stop markers and service alerts.
-  Ported from `kvb-hafas-client`'s `map_server.py`/`map.html` prototype.
+  Served by `kvb-hafas-client`'s `kvb_hafas.server.http_server`.
 - **Departures** (`departures.html`) — search KVB stops, star favorites, and
   watch a live, auto-refreshing departure board (planned/realtime time,
   delay, platform, cancellations).
@@ -99,34 +101,31 @@ same defaults) so it also runs directly, outside HA:
 
 ```bash
 uv sync
-uv run python3 app/server.py       # http://localhost:8099
+uv run python3 -m kvb_hafas.server.http_server       # http://localhost:8099
 ```
 
 Env vars mirror the option names above, upper-cased (`HISTORY_ENABLED`, `VEHICLE_POLL_CACHE_TTL_SECONDS`,
 `FAVORITE_STOP_IDS` as a
-JSON array or comma-separated list, etc.) — see `app/server.py` for the exact
-list and defaults.
+JSON array or comma-separated list, etc.) — see `kvb_hafas/server/http_server.py` in
+[kvb-hafas-client](https://github.com/christoph-teichmeister/kvb-hafas-client) for the
+exact list and defaults. For local dev on that server itself, just run it from that repo
+directly: `uv run map_server.py`.
 
 ## Repository layout
 
-This repo is the HA add-on shell only — the web UI (HTML/CSS/vendored
-Leaflet) lives in
-[kvb-hafas-client](https://github.com/christoph-teichmeister/kvb-hafas-client)'s
-`kvb_hafas.webui` package and is loaded at runtime via `importlib.resources`.
+This repo is the HA add-on shell only — no server or UI code lives here. Both
+the web UI (HTML/CSS/vendored Leaflet, `kvb_hafas.webui`) and the HTTP server
+(`kvb_hafas.server.http_server`, vehicle/alert/network/stop APIs, stop search
++ departures, live/historical stats, SQLite vehicle history) live in
+[kvb-hafas-client](https://github.com/christoph-teichmeister/kvb-hafas-client)
+and are imported from there at runtime.
 
 ```
 config.yaml       HA app manifest (options schema, ingress config)
 Dockerfile         App image build
-run.sh             Entrypoint: options.json -> env vars -> server.py
-pyproject.toml     Project + deps (kvb-hafas-client from GitHub, requests), managed via uv
+run.sh             Entrypoint: options.json -> env vars -> kvb_hafas.server.http_server
+pyproject.toml     Project + deps (kvb-hafas-client from GitHub), managed via uv
 uv.lock            Locked dependency versions for reproducible builds
-app/
-  server.py         stdlib http.server app: vehicle/alert/network/stop APIs,
-                     stop search + departures, live/historical stats,
-                     HA Ingress-safe (relative URLs throughout), serves
-                     kvb_hafas.webui's pages/assets via importlib.resources
-  history_store.py   SQLite vehicle_observations table + queries
-  stats.py            live snapshot stats + delegate to history_store
 data/
   rail_geometry.json  OSM-derived rail geometry (from kvb-hafas-client)
 ```
