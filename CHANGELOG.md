@@ -3,6 +3,11 @@
 All notable changes to this add-on are documented here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [2026.9.5] - 2026-09-19
+
+### Changed
+- Synced bundled UI/library to kvb-hafas-client@ee3d434.
+
 ## [2026.9.4] - 2026-09-19
 
 ### Changed
