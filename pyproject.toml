@@ -1,6 +1,6 @@
 [project]
 name = "kvb-ha-map"
-version = "2026.9.3"
+version = "2026.9.4"
 description = "Home Assistant Add-on: Live-Karte, Haltestellen-Board und Verspätungs-Statistiken für KVB (Köln)"
 readme = "README.md"
 license = "MIT"
