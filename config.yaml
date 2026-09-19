@@ -1,6 +1,6 @@
 ---
 name: "KVB Live Map"
-version: "0.1.6"
+version: "2026.9.0"
 slug: "kvb_ha_map"
 description: "Live map of KVB (Köln) vehicles, stop departures and history/stats — unofficial companion add-on for kvb-hafas-client."
 url: "https://github.com/christoph-teichmeister/kvb-ha-map"

@@ -1,12 +1,20 @@
 # Changelog
 
+All notable changes to this add-on are documented here. Format loosely follows
+[Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
+
+## [2026.9.0] - 2026-09-19
+
+### Changed
+- Switched versioning scheme from SemVer to CalVer (`yyyy.mm.patch`), to
+  match the companion `kvb-hafas-client` repo. The auto-sync workflow now
+  resets `patch` to `0` on month rollover instead of incrementing an
+  arbitrary third SemVer field forever.
 
 ## [0.1.6] - 2026-09-18
 
 ### Changed
 - Synced bundled UI/library to kvb-hafas-client@63c2961.
-All notable changes to this add-on are documented here. Format loosely follows
-[Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [0.1.5] - 2026-09-18
 
