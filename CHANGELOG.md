@@ -6,6 +6,11 @@ All notable changes to this add-on are documented here. Format loosely follows
 ## [2026.10.1] - 2026-10-10
 
 ### Changed
+- Synced bundled UI/library to kvb-hafas-client 2026.10.1 (@d30fa35).
+
+## [2026.10.1] - 2026-10-10
+
+### Changed
 - `backup: cold`: Supervisor stops the add-on while backing it up, so the
   SQLite history DB is never copied mid-write.
 - `run.sh` deletes a leftover `/data/history.db.corrupt` on start (it doubled
