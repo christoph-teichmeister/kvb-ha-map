@@ -3,6 +3,14 @@
 All notable changes to this add-on are documented here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [2026.10.1] - 2026-10-10
+
+### Changed
+- `backup: cold`: Supervisor stops the add-on while backing it up, so the
+  SQLite history DB is never copied mid-write.
+- `run.sh` deletes a leftover `/data/history.db.corrupt` on start (it doubled
+  the backup size).
+
 ## [2026.10.0] - 2026-10-02
 
 ### Changed

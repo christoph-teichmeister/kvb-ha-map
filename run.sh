@@ -39,6 +39,10 @@ else
   echo "[run.sh] ${OPTIONS_FILE} not found — running with kvb_hafas.server.http_server's built-in defaults (standalone/dev mode)"
 fi
 
+# Leftover from a manual recovery of a corrupted history DB; it doubled the
+# backup size, so drop it if it is still around.
+rm -f /data/history.db.corrupt
+
 export DATA_DIR="${DATA_DIR:-/app/data}"
 export PORT="${PORT:-8099}"
 
