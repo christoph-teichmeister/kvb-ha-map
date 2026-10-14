@@ -1,3 +1,5 @@
+<p align="center"><img src="logo.png" alt="KVB Live Map" width="250"></p>
+
 # kvb-ha-map
 
 Home Assistant Supervisor App wrapping
