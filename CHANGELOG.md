@@ -7,6 +7,10 @@ All notable changes to this add-on are documented here. Format loosely follows
 
 ### Changed
 - Synced bundled UI/library to kvb-hafas-client 2026.10.4 (@47a884d).
+- Vehicle delays are dropped when the realtime prediction for the next stop
+  is more than 60 min from now (vehicle tied to the wrong trip); the delay cap
+  goes from 360 to 180 min. `stats.db` is rebuilt once on start so existing
+  samples are cleaned too.
 
 ## [2026.10.3] - 2026-10-14
 
