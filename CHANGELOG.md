@@ -7,6 +7,11 @@ All notable changes to this add-on are documented here. Format loosely follows
 
 ### Changed
 - Synced bundled UI/library to kvb-hafas-client 2026.10.2 (@8d59fbd).
+- Dashboard stats come from hourly per-line aggregates in `/data/stats.db`
+  (built from the existing history on first start): milliseconds instead of
+  seconds. Delays beyond ±360 min are dropped and logged.
+- `backup_exclude: history.db*`: raw samples (~6 GB/year) stay out of HA
+  backups; `stats.db` is backed up.
 
 ## [2026.10.1] - 2026-10-10
 
