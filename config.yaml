@@ -19,6 +19,9 @@ webui: "http://[HOST]:[PORT:8099]"
 startup: application
 boot: auto
 backup: cold
+# Raw position samples (~6 GB/year) stay out of backups; stats.db is kept.
+backup_exclude:
+  - "history.db*"
 map: []
 options:
   history_enabled: true

@@ -47,6 +47,12 @@ high-frequency sampling). History sampling reuses whatever the last
 `/api/vehicles` poll already fetched — it never makes an extra KVB request
 just to keep history.
 
+Storage: raw samples (`/data/history.db`, roughly 6 GB per year at the
+default 365-day retention) are **excluded from Home Assistant backups**. The
+dashboard statistics come from hourly per-line aggregates in
+`/data/stats.db` (a few MB per year, kept forever), which *is* backed up — so
+after a restore the stats survive, only single-trip replays start empty.
+
 ## Installing as a Home Assistant App
 
 1. In Home Assistant: **Settings → Apps → App Store → ⋮ → Repositories**,
