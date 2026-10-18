@@ -1,6 +1,6 @@
 ---
 name: "KVB Live Map"
-version: "2026.10.6"
+version: "2026.10.6.1"
 slug: "kvb_ha_map"
 description: "Live map of KVB (Köln) vehicles, stop departures and history/stats — unofficial companion add-on for kvb-hafas-client."
 url: "https://github.com/christoph-teichmeister/kvb-ha-map"
@@ -15,6 +15,7 @@ ingress_port: 8099
 ingress_entry: /
 panel_icon: mdi:tram
 panel_title: KVB Live Map
+panel_admin: false
 webui: "http://[HOST]:[PORT:8099]"
 startup: application
 boot: auto
