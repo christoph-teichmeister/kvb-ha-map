@@ -3,6 +3,12 @@
 All notable changes to this add-on are documented here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [2026.10.7.1] - 2026-10-21
+
+### Security
+- certifi 2026.7.22 -> 2026.10.19 and uv 0.9 -> 0.13.4 (emSign CA removal).
+- Base image Alpine 3.20 (EOL) -> 3.22, still Python 3.13.
+
 ## [2026.10.7] - 2026-10-21
 
 ### Changed

@@ -1,4 +1,4 @@
-ARG BUILD_FROM=ghcr.io/home-assistant/amd64-base-python:3.13-alpine3.20
+ARG BUILD_FROM=ghcr.io/home-assistant/amd64-base-python:3.13-alpine3.22
 FROM $BUILD_FROM
 
 ENV LANG=C.UTF-8 \
@@ -13,7 +13,7 @@ WORKDIR /app
 # git is needed only to resolve kvb-hafas-client straight from GitHub.
 RUN apk add --no-cache git bash jq
 
-COPY --from=ghcr.io/astral-sh/uv:0.9-alpine /usr/local/bin/uv /usr/local/bin/uv
+COPY --from=ghcr.io/astral-sh/uv:0.13.4-alpine /usr/local/bin/uv /usr/local/bin/uv
 
 COPY pyproject.toml uv.lock /app/
 RUN uv sync --frozen --no-dev
