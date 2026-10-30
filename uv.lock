@@ -180,8 +180,8 @@ requires-dist = [{ name = "kvb-hafas-client", git = "https://github.com/christop
 
 [[package]]
 name = "kvb-hafas-client"
-version = "2026.10.7"
-source = { git = "https://github.com/christoph-teichmeister/kvb-hafas-client.git#ed67a8409d5b930d0f0f360a514be3b72d1dc635" }
+version = "2026.10.8"
+source = { git = "https://github.com/christoph-teichmeister/kvb-hafas-client.git#cec7e8bfb058a0d722e94b188f8dca543721a1d3" }
 dependencies = [
     { name = "requests" },
     { name = "tzdata" },
